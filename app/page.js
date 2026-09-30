@@ -160,9 +160,9 @@ function PhoneHome({identity,datingApps,authUser,logout}){
  const phoneInitRef=useRef(false),lastPageRef=useRef(0),lastOpenedRef=useRef(null);
  useEffect(()=>{const initial=!phoneInitRef.current,previous=lastOpenedRef.current;let event=null;if(initial)event={type:'phone_home',label:'Pantalla de inicio'};else if(opened!==previous)event=opened?{type:'open_app',label:opened}:{type:'close_app',label:previous||'Aplicación'};phoneInitRef.current=true;lastOpenedRef.current=opened;trackPhone({screen:opened?'app':'home',currentApp:opened,homePage:page,locked:false,unlocked:true,lastSeen:new Date().toISOString()},event)},[opened]);
  useEffect(()=>{if(lastPageRef.current!==page){lastPageRef.current=page;trackPhone({screen:'home',currentApp:null,homePage:page,lastSeen:new Date().toISOString()},{type:'home_page',label:'Página '+(page+1)})}},[page]);
- function pointerDown(e){if(opened)return;setStartX(e.clientX);setDragX(0);setPressing(true);try{e.currentTarget.setPointerCapture(e.pointerId)}catch{}}
+ function pointerDown(e){if(opened||e.target.closest?.('.ios-app'))return;setStartX(e.clientX);setDragX(0);setPressing(true);try{e.currentTarget.setPointerCapture(e.pointerId)}catch{}}
  function pointerMove(e){if(startX===null||opened)return;setDragX(Math.max(-110,Math.min(110,e.clientX-startX)))}
- function pointerUp(){if(startX!==null){if(dragX<-46)setPage(1);else if(dragX>46)setPage(0)}setStartX(null);setDragX(0);setPressing(false)}
+ function pointerUp(e){if(startX!==null){if(dragX<-46)setPage(1);else if(dragX>46)setPage(0);try{e?.currentTarget?.releasePointerCapture?.(e.pointerId)}catch{}}setStartX(null);setDragX(0);setPressing(false)}
  const transform=page===0?'translate3d('+dragX+'px,0,0)':'translate3d(calc(-50% + '+dragX+'px),0,0)';
  return <div className="home realistic-home">
    <div className="wallpaper-layer"/><div className="home-shade"/><Status/>
