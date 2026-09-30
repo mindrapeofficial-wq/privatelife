@@ -190,13 +190,13 @@ export default function AdminPage(){
   const chars=save.world.characters,events=save.world.events;
   const character=useMemo(()=>chars.find(x=>x.id===charId)||chars[0]||null,[chars,charId]);
   const phone=player?.phone||{state:{},activity:[],whatsapp:[],updatedAt:null},phoneState=phone.state||{},phoneActivity=Array.isArray(phone.activity)?phone.activity:[],phoneWhatsapp=Array.isArray(phone.whatsapp)?phone.whatsapp:[];
-  const life=player?.life||{characters:[],events:[],autonomy:[],autonomyEvents:[],memories:[],intentions:[],context:null,worldLocation:null,timezone:'UTC',speed:1,paused:false},lifeCharacters=Array.isArray(life.characters)?life.characters:[],lifeEvents=Array.isArray(life.events)?life.events:[],lifeAutonomy=Array.isArray(life.autonomy)?life.autonomy:[],lifeAutonomyEvents=Array.isArray(life.autonomyEvents)?life.autonomyEvents:[],lifeMemories=Array.isArray(life.memories)?life.memories:[],lifeIntentions=Array.isArray(life.intentions)?life.intentions:[],playerContext=life.context||null,worldLocation=life.worldLocation||null;
+  const life=player?.life||{characters:[],events:[],autonomy:[],autonomyEvents:[],memories:[],intentions:[],socialGraph:{edges:[],recentEvents:[],information:[],analytics:{}},context:null,worldLocation:null,timezone:'UTC',speed:1,paused:false},lifeCharacters=Array.isArray(life.characters)?life.characters:[],lifeEvents=Array.isArray(life.events)?life.events:[],lifeAutonomy=Array.isArray(life.autonomy)?life.autonomy:[],lifeAutonomyEvents=Array.isArray(life.autonomyEvents)?life.autonomyEvents:[],lifeMemories=Array.isArray(life.memories)?life.memories:[],lifeIntentions=Array.isArray(life.intentions)?life.intentions:[],socialGraph=life.socialGraph||{edges:[],recentEvents:[],information:[],analytics:{}},socialEdges=Array.isArray(socialGraph.edges)?socialGraph.edges:[],socialEvents=Array.isArray(socialGraph.recentEvents)?socialGraph.recentEvents:[],socialInformation=Array.isArray(socialGraph.information)?socialGraph.information:[],playerContext=life.context||null,worldLocation=life.worldLocation||null;
   const phoneFresh=phone.updatedAt&&Date.now()-new Date(phone.updatedAt).getTime()<12000&&phoneState.visibility!=='offline';
   const installedPhoneApps=['Instagram','WhatsApp','Facebook',...(save.datingApps?.tinder?['Tinder']:[]),...(save.datingApps?.grindr?['Grindr']:[]),'Contactos','Fotos','Calendario','App Store','Ahora','Notas','Ajustes','Teléfono','Mensajes','Safari','Música'];
   const aiRuns=Array.isArray(aiMind?.runs)?aiMind.runs:[];
   const aiRun=aiRuns.find(r=>String(r.id)===String(aiMindSelectedRun))||aiRuns[0]||null;
   const aiPlan=aiRun?.plan||aiMind?.state?.lastPlan||{};
-  const aiActionCount=(aiPlan.newCharacters?.length||0)+(aiPlan.characterUpdates?.length||0)+(aiPlan.relationshipUpdates?.length||0)+(aiPlan.events?.length||0)+(aiPlan.messages?.length||0);
+  const aiActionCount=(aiPlan.newCharacters?.length||0)+(aiPlan.characterUpdates?.length||0)+(aiPlan.relationshipUpdates?.length||0)+(aiPlan.socialActions?.length||0)+(aiPlan.informationActions?.length||0)+(aiPlan.events?.length||0)+(aiPlan.messages?.length||0);
   const consoleEntries=useMemo(()=>{
     const out=[];
     const push=(entry)=>{if(entry?.at)out.push({...entry,at:entry.at})};
@@ -241,6 +241,20 @@ export default function AdminPage(){
       title:'Un personaje mantiene una intención '+String(intent.status||'pending'),
       text:String(intent.summary||'Intención narrativa sin descripción.'),
       meta:String(intent.characterKey||'NPC')+' · prioridad '+String(intent.priority??'—')
+    }));
+
+    socialEvents.forEach(ev=>push({
+      id:'social:'+ev.id,kind:'world',source:'SOCIEDAD NPC',at:ev.gameAt||ev.createdAt,
+      title:String(ev.type||'interacción').replaceAll('_',' ')+' · '+String(ev.actorKey||'NPC')+' ↔ '+String(ev.targetKey||'NPC'),
+      text:String(ev.summary||'Interacción social entre personajes.'),
+      meta:ev.visibility==='player_relevant'?'POTENCIALMENTE RELEVANTE PARA EL JUGADOR':'RED SOCIAL NPC'
+    }));
+
+    socialInformation.filter(info=>(info.holderCount||0)>=2||String(info.subjectKey||'').startsWith('player')).forEach(info=>push({
+      id:'social-info:'+info.id,kind:'ai',source:'INFORMACIÓN SOCIAL',at:info.createdGameAt,
+      title:(info.holderCount||0)+' personajes conocen una información',
+      text:String(info.content||'Información sin contenido.'),
+      meta:'sensibilidad '+String(info.sensitivity??'—')+' · importancia '+String(info.importance??'—')+' · '+String(info.truthStatus||'unknown')
     }));
 
     if(playerContext?.updated_at)push({
@@ -314,7 +328,7 @@ export default function AdminPage(){
     });
 
     return out.sort((a,b)=>new Date(b.at).getTime()-new Date(a.at).getTime()).slice(0,900);
-  },[phoneActivity,phoneWhatsapp,lifeEvents,lifeAutonomyEvents,lifeMemories,lifeIntentions,playerContext,worldLocation,events,save.world?.directorLog,save.identity?.name,aiRuns]);
+  },[phoneActivity,phoneWhatsapp,lifeEvents,lifeAutonomyEvents,lifeMemories,lifeIntentions,socialEvents,socialInformation,playerContext,worldLocation,events,save.world?.directorLog,save.identity?.name,aiRuns]);
   const visibleConsoleEntries=useMemo(()=>{
     const q=consoleQuery.trim().toLowerCase();
     return consoleEntries.filter(x=>(consoleFilter==='all'||x.kind===consoleFilter)&&(!q||[x.source,x.title,x.text,x.meta].some(v=>String(v||'').toLowerCase().includes(q))));
