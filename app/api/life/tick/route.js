@@ -281,6 +281,15 @@ export async function POST(request){
         lifeState:candidate.lifeState,
         offlineCatchUp:offlineGapMinutes>3
       });
+      if(generated.eventSuggestion){
+        await journal(user.id,candidate,dueAt,'npc_event_seed',{
+          channel:'world',
+          suggestion:generated.eventSuggestion,
+          mood:generated.mood,
+          lifeState:candidate.lifeState,
+          sourceMessageId:String(message.id)
+        });
+      }
 
       const next=scheduleFrom(gameNow,nextAutonomyDelayMinutes(candidate.profile,candidate.characterKey+'|next|'+dayKey+'|'+message.id));
       await writeAutonomyState(user.id,candidate,next,{
