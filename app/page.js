@@ -200,7 +200,7 @@ function PhoneHome({identity,datingApps,authUser,logout}){
      <PhoneApp dock cssIcon="safari" name="" onOpen={()=>setOpened('Safari')}/>
      <PhoneApp dock cssIcon="music" name="" onOpen={()=>setOpened('Música')}/>
    </div>
-   {opened&&<AppWindow name={opened} onClose={()=>setOpened(null)}/>}
+   {opened&&<AppWindow name={opened} onClose={()=>setOpened(null)} authUser={authUser} logout={logout}/>}
  </div>
 }
 function PhoneApp({src,name,onOpen,dock=false,cssIcon='',brand=false}){
@@ -209,14 +209,81 @@ function PhoneApp({src,name,onOpen,dock=false,cssIcon='',brand=false}){
    {name&&<span className="ios-label">{name}</span>}
  </button>
 }
-function AppWindow({name,onClose}){
+function AppWindow({name,onClose,authUser,logout}){
  if(name==='Contactos')return <div className="app-window app-contactos native-window"><ContactsApp onClose={onClose}/></div>;
+ if(name==='Ajustes')return <div className="app-window app-ajustes native-settings-window"><Status/><SettingsApp onClose={onClose} authUser={authUser} logout={logout}/><button className="home-gesture-button" aria-label="Volver al inicio" onClick={onClose}><span/></button></div>;
  return <div className={'app-window app-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}>
    <Status/><div className="app-window-head"><button onClick={onClose}>‹</button><b>{name}</b><span/></div>
    <div className="app-window-content"><div className="app-window-title">{name}</div><div className="fake-card"/><div className="fake-row"/><div className="fake-row short"/><div className="fake-row"/></div>
    <button className="home-gesture-button" aria-label="Volver al inicio" onClick={onClose}><span/></button>
  </div>
 }
+
+const PHONE_SETTINGS_KEY='private-life-phone-settings-v1';
+const PHONE_SETTINGS_DEFAULTS={notifications:true,vibration:true,previews:true};
+
+function SettingsApp({onClose,authUser,logout}){
+ const [screen,setScreen]=useState('root');
+ const [prefs,setPrefs]=useState(PHONE_SETTINGS_DEFAULTS);
+ useEffect(()=>{try{setPrefs({...PHONE_SETTINGS_DEFAULTS,...JSON.parse(localStorage.getItem(PHONE_SETTINGS_KEY)||'{}')})}catch{}},[]);
+ function update(key,value){
+   const next={...prefs,[key]:value};setPrefs(next);
+   try{localStorage.setItem(PHONE_SETTINGS_KEY,JSON.stringify(next))}catch{}
+   window.dispatchEvent(new CustomEvent('private-life:settings-changed',{detail:next}));
+ }
+ function openCharacter(){
+   onClose();
+   setTimeout(()=>{if(typeof window.__plOpenTools==='function')window.__plOpenTools()},120);
+ }
+ if(screen==='privacy')return <div className="settings-app">
+   <SettingsNav title="Privacidad y datos" onBack={()=>setScreen('root')}/>
+   <div className="settings-scroll detail">
+     <h1>Privacidad y datos</h1>
+     <section className="settings-info-card"><b>Tu partida</b><p>El perfil, las decisiones y el estado de la partida se guardan vinculados a tu cuenta para poder continuar desde otros dispositivos.</p></section>
+     <section className="settings-info-card"><b>Fotos y conversaciones</b><p>Las referencias que añadas al personaje se usan como contexto del juego. La app no debe deducir de ellas orientación sexual, salud, religión, ideología u otros datos sensibles.</p></section>
+     <section className="settings-info-card"><b>Personas reales</b><p>Solo debes aportar fotos o conversaciones que tengas permiso para utilizar dentro de Private Life.</p></section>
+   </div>
+ </div>;
+ if(screen==='about')return <div className="settings-app">
+   <SettingsNav title="Información" onBack={()=>setScreen('root')}/>
+   <div className="settings-scroll detail">
+     <div className="settings-about-logo">PL</div><h1 className="settings-about-title">PRIVATE LIFE</h1><p className="settings-about-sub">Simulador social narrativo · +18</p>
+     <section className="settings-group"><SettingsValue label="Versión" value="0.1.0"/><SettingsValue label="Estado" value="Beta"/></section>
+     <p className="settings-footnote">Las historias y relaciones evolucionan según las decisiones del jugador y el estado de la simulación.</p>
+   </div>
+ </div>;
+ return <div className="settings-app">
+   <SettingsNav title="Ajustes" onBack={onClose}/>
+   <div className="settings-scroll">
+     <h1>Ajustes</h1>
+     <button className="settings-account" onClick={openCharacter}>
+       <div className="settings-account-avatar">PL</div><div><b>{authUser||'Jugador'}</b><span>Mi personaje y perfil</span></div><em>›</em>
+     </button>
+     <div className="settings-section-label">PRIVATE LIFE</div>
+     <section className="settings-group">
+       <SettingsRow icon="👤" label="Mi personaje" onClick={openCharacter}/>
+       <SettingsRow icon="🔒" label="Privacidad y datos" onClick={()=>setScreen('privacy')}/>
+     </section>
+     <div className="settings-section-label">NOTIFICACIONES</div>
+     <section className="settings-group">
+       <SettingsToggle icon="🔔" label="Notificaciones" checked={prefs.notifications} onChange={v=>update('notifications',v)}/>
+       <SettingsToggle icon="📳" label="Vibración" checked={prefs.vibration} onChange={v=>update('vibration',v)}/>
+       <SettingsToggle icon="💬" label="Mostrar previsualizaciones" checked={prefs.previews} onChange={v=>update('previews',v)}/>
+     </section>
+     <div className="settings-section-label">INFORMACIÓN</div>
+     <section className="settings-group">
+       <SettingsRow icon="ℹ️" label="Acerca de Private Life" onClick={()=>setScreen('about')}/>
+       <SettingsValue label="Versión" value="0.1.0"/>
+     </section>
+     <section className="settings-group settings-danger"><button onClick={logout}>Cerrar sesión</button></section>
+     <p className="settings-footnote">PRIVATE LIFE es una experiencia para mayores de 18 años.</p>
+   </div>
+ </div>
+}
+function SettingsNav({title,onBack}){return <div className="settings-nav"><button onClick={onBack}>‹</button><b>{title}</b><span/></div>}
+function SettingsRow({icon,label,onClick}){return <button className="settings-row" onClick={onClick}><i>{icon}</i><span>{label}</span><em>›</em></button>}
+function SettingsValue({label,value}){return <div className="settings-row settings-value"><span>{label}</span><b>{value}</b></div>}
+function SettingsToggle({icon,label,checked,onChange}){return <label className="settings-row settings-toggle"><i>{icon}</i><span>{label}</span><input type="checkbox" checked={checked} onChange={e=>onChange(e.target.checked)}/><u/></label>}
 
 function AuthScreen({mode,setMode,form,setForm,error,busy,login,register}){const creating=mode==='register';function submit(e){e.preventDefault();creating?register():login()}return <main className="authpage"><section className="authpanel"><div className="authbrand"><div className="authmark">P</div><div><div className="brand smallbrand">PRIVATE LIFE</div><p>Tu vida. Tus decisiones. Tu historia.</p></div></div><div className="authswitch"><button className={!creating?'active':''} onClick={()=>setMode('login')} type="button">INICIAR SESIÓN</button><button className={creating?'active':''} onClick={()=>setMode('register')} type="button">CREAR USUARIO</button></div><form className="authform" onSubmit={submit}><label><span>USUARIO</span><input autoComplete="username" value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="Tu nombre de usuario"/></label><label><span>CONTRASEÑA</span><input type="password" autoComplete={creating?'new-password':'current-password'} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="••••••••"/></label>{creating&&<label><span>REPETIR CONTRASEÑA</span><input type="password" autoComplete="new-password" value={form.repeat} onChange={e=>setForm({...form,repeat:e.target.value})} placeholder="••••••••"/></label>}{error&&<div className="autherror">{error}</div>}<button className="authsubmit" disabled={busy} type="submit">{busy?'PROCESANDO...':creating?'CREAR CUENTA':'ENTRAR'}</button></form><p className="authnote">{creating?'La cuenta guardará tu partida en el servidor para que puedas recuperarla desde otros dispositivos.':'Entra para continuar tu partida de Private Life.'}</p></section></main>}
 function PhotoCropper({src,onCancel,onSave}){
