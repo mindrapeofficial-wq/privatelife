@@ -89,7 +89,7 @@ function writingExamples(contact) {
 }
 
 
-async function directorModelReply({ contact, character, text, hasImage, recent, events, phoneActivity, save, lifeState, playerContext }) {
+async function directorModelReply({ contact, character, text, hasImage, recent, events, phoneActivity, save, lifeState, playerContext, playerLocation }) {
   try {
     const instructions = [
       'Eres el motor narrativo central de PRIVATE LIFE.',
@@ -110,6 +110,7 @@ async function directorModelReply({ contact, character, text, hasImage, recent, 
         identity: save?.identity || {},
         profile: save?.profile || {},
         currentContext: playerContext || null,
+        worldLocation: playerLocation || null,
       },
       contact,
       worldCharacter: character || null,
@@ -241,11 +242,12 @@ async function getLifeClock(userId) {
 }
 
 async function loadContext(userId, contact) {
-  const [saveResult,activity,clock,playerContextResult]=await Promise.all([
+  const [saveResult,activity,clock,playerContextResult,playerLocationResult]=await Promise.all([
     query('SELECT save_data FROM private_life.game_saves WHERE user_id = $1 LIMIT 1', [userId]),
     query('SELECT event_type, event_label, event_data, created_at FROM private_life.phone_activity WHERE user_id = $1 ORDER BY created_at DESC LIMIT 60',[userId]),
     getLifeClock(userId),
-    query('SELECT location_key,location_label,activity_key,activity_label,availability,social_exposure,privacy,started_game_at,expected_until_game_at,revision,updated_at FROM private_life.player_context WHERE user_id=$1 LIMIT 1',[userId])
+    query('SELECT location_key,location_label,activity_key,activity_label,availability,social_exposure,privacy,started_game_at,expected_until_game_at,revision,updated_at FROM private_life.player_context WHERE user_id=$1 LIMIT 1',[userId]),
+    query('SELECT display_label,area,city,region,country,country_code,timezone,updated_at FROM private_life.player_location WHERE user_id=$1 LIMIT 1',[userId])
   ]);
   const save = saveResult.rows[0]?.save_data || {};
   const character = findCharacter(save, contact);
@@ -261,7 +263,7 @@ async function loadContext(userId, contact) {
     characterKey:String(character?.id||contact?.npcId||contact?.id||contact?.name||'npc'),
     seed:String(Date.now())
   });
-  return { save, character, events: eventList, phoneActivity: activity.rows || [], clock, lifeState, playerContext: playerContextResult.rows[0] || null };
+  return { save, character, events: eventList, phoneActivity: activity.rows || [], clock, lifeState, playerContext: playerContextResult.rows[0] || null, playerLocation: playerLocationResult.rows[0] || null };
 }
 
 async function saveWorld(userId, save) {
@@ -415,6 +417,7 @@ export async function POST(request) {
       save: context.save,
       lifeState: context.lifeState,
       playerContext: context.playerContext,
+      playerLocation: context.playerLocation,
     });
 
     const reply = modelResult?.reply || centralReply({
