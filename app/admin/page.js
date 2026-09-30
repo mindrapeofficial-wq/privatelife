@@ -1,0 +1,156 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+
+const TRAITS=['confianza','atraccion','apego','tension','sospecha','celos','curiosidad','resentimiento'];
+
+async function api(url,options={}){
+  const response=await fetch(url,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});
+  let data={};try{data=await response.json()}catch{}
+  if(!response.ok)throw new Error(data.error||'Error de conexión');
+  return data;
+}
+function uid(){return globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2)+Date.now().toString(36)}
+function world(save={}){
+  return {...save,world:{characters:[],events:[],directorLog:[],...(save.world||{}),
+    characters:Array.isArray(save.world?.characters)?save.world.characters:[],
+    events:Array.isArray(save.world?.events)?save.world.events:[],
+    directorLog:Array.isArray(save.world?.directorLog)?save.world.directorLog:[]}};
+}
+function fmt(v){if(!v)return '—';try{return new Intl.DateTimeFormat('es-ES',{dateStyle:'medium',timeStyle:'short'}).format(new Date(v))}catch{return String(v)}}
+
+export default function AdminPage(){
+  const [ready,setReady]=useState(false),[users,setUsers]=useState([]),[selectedId,setSelectedId]=useState('');
+  const [player,setPlayer]=useState(null),[tab,setTab]=useState('overview'),[charId,setCharId]=useState('');
+  const [eventDraft,setEventDraft]=useState(''),[chatDraft,setChatDraft]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
+  const [chat,setChat]=useState([{role:'ai',text:'Director conectado. Selecciona una partida y pregúntame qué está ocurriendo.'}]);
+
+  async function loadUsers(preferred){
+    const data=await api('/api/admin/users',{cache:'no-store'});
+    setUsers(data.users||[]);
+    const next=preferred||selectedId||data.users?.[0]?.id||'';
+    if(next)setSelectedId(String(next));
+  }
+  async function loadPlayer(id){
+    if(!id){setPlayer(null);return}
+    setBusy(true);
+    try{
+      const data=await api('/api/admin/player?userId='+encodeURIComponent(id),{cache:'no-store'});
+      const loaded={...data.player,save:world(data.player.save)};
+      setPlayer(loaded);setCharId(loaded.save.world.characters[0]?.id||'');
+    }catch(e){setNotice(e.message)}finally{setBusy(false)}
+  }
+  useEffect(()=>{let cancelled=false;(async()=>{try{
+    const me=await api('/api/auth/me',{cache:'no-store'});
+    if(me.user?.role!=='admin'){window.location.replace('/');return}
+    if(!cancelled)await loadUsers();
+  }catch{window.location.replace('/')}finally{if(!cancelled)setReady(true)}})();return()=>{cancelled=true}},[]);
+  useEffect(()=>{if(selectedId)loadPlayer(selectedId)},[selectedId]);
+
+  const save=player?.save?world(player.save):world({});
+  const chars=save.world.characters,events=save.world.events;
+  const character=useMemo(()=>chars.find(x=>x.id===charId)||chars[0]||null,[chars,charId]);
+
+  function localEdit(fn){
+    if(!player)return;
+    const next=structuredClone(save);fn(next);
+    setPlayer(cur=>({...cur,save:next}));
+  }
+  async function persist(nextSave=save,logText=''){
+    if(!player)return;
+    const next=world(nextSave);
+    if(logText)next.world.directorLog=[{id:uid(),at:new Date().toISOString(),text:logText},...next.world.directorLog].slice(0,200);
+    setBusy(true);
+    try{
+      const data=await api('/api/admin/player',{method:'PUT',body:JSON.stringify({userId:player.id,save:next})});
+      setPlayer(cur=>({...cur,save:world(data.save),updatedAt:new Date().toISOString()}));
+      setNotice('Cambios guardados.');await loadUsers(player.id);setTimeout(()=>setNotice(''),1500);
+    }catch(e){setNotice(e.message)}finally{setBusy(false)}
+  }
+  function addCharacter(name='Nuevo personaje'){
+    const c={id:uid(),name,age:18,status:'activo',origin:'director',role:'',occupation:'',location:'',appearance:'',personality:'',communication:'',objectives:'',boundaries:'',secrets:'',notes:'',traits:Object.fromEntries(TRAITS.map(t=>[t,50])),createdAt:new Date().toISOString()};
+    const next=structuredClone(save);next.world.characters.unshift(c);setPlayer(cur=>({...cur,save:next}));setCharId(c.id);return next;
+  }
+  function patchCharacter(patch){if(!character)return;localEdit(next=>{next.world.characters=next.world.characters.map(c=>c.id===character.id?{...c,...patch}:c)})}
+  function patchTrait(trait,value){if(!character)return;localEdit(next=>{next.world.characters=next.world.characters.map(c=>c.id===character.id?{...c,traits:{...(c.traits||{}),[trait]:Number(value)}}:c)})}
+  async function addEvent(text=eventDraft){
+    text=String(text||'').trim();if(!text||!player)return;
+    const next=structuredClone(save);next.world.events.unshift({id:uid(),description:text,status:'pendiente',trigger:'manual',condition:'',createdAt:new Date().toISOString()});
+    setEventDraft('');await persist(next,'Evento creado: '+text);
+  }
+  async function sendDirector(e){
+    e.preventDefault();const prompt=chatDraft.trim();if(!prompt||!player)return;
+    setChatDraft('');setChat(v=>[...v,{role:'admin',text:prompt}]);
+    const lower=prompt.toLowerCase();
+    if(lower.includes('ponte al día')||lower.includes('resumen')||lower.includes('resume')){
+      setChat(v=>[...v,{role:'ai',text:`Partida de @${player.username}: ${chars.length} personajes, ${events.filter(x=>x.status!=='cerrado').length} eventos abiertos. Personaje del jugador: ${save.identity?.name||'sin definir'}. Último guardado: ${fmt(player.updatedAt)}.`}]);return;
+    }
+    const m=prompt.match(/(?:crea|añade|mete)(?: un| una)? personaje(?: nuevo)?(?: llamado| llamada)?\s+([^,.]+)/i);
+    if(m){
+      const name=m[1].trim().slice(0,60),next=addCharacter(name);await persist(next,'Personaje creado: '+name);
+      setChat(v=>[...v,{role:'ai',text:`He creado a ${name}. Su ficha ya está disponible para ajustar apariencia, personalidad, parámetros y secretos.`}]);setTab('characters');return;
+    }
+    const ev=prompt.match(/(?:programa|crea|añade|lanza)(?: un)? evento[:\s]+(.+)/i);
+    if(ev){await addEvent(ev[1]);setChat(v=>[...v,{role:'ai',text:'Evento añadido a la cola narrativa. El jugador no verá que procede del panel.'}]);setTab('events');return}
+    setChat(v=>[...v,{role:'ai',text:'Puedo resumir la partida, crear personajes y programar eventos. También puedes editar manualmente cualquier ficha.'}]);
+  }
+  async function logout(){try{await api('/api/auth/logout',{method:'POST',body:'{}'})}catch{}window.location.replace('/')}
+
+  if(!ready)return <main className="admin-loading">DIRECTOR AI · conectando…</main>;
+  return <main className="admin-shell">
+    <aside className="admin-sidebar">
+      <div className="admin-brand"><span>PRIVATE LIFE</span><b>DIRECTOR AI</b></div>
+      <div className="admin-player-label">PARTIDAS</div>
+      <div className="admin-player-list">
+        {!users.length&&<div className="admin-empty">Todavía no hay jugadores registrados.</div>}
+        {users.map(u=><button key={u.id} className={'admin-player '+(String(u.id)===String(selectedId)?'active':'')} onClick={()=>setSelectedId(String(u.id))}>
+          <span className="admin-avatar">{(u.identity?.name||u.username||'?').slice(0,1).toUpperCase()}</span>
+          <span><b>{u.identity?.name||'@'+u.username}</b><small>@{u.username} · {u.characterCount} NPC · {u.eventCount} eventos</small></span>
+        </button>)}
+      </div>
+      <button className="admin-logout" onClick={logout}>Cerrar sesión</button>
+    </aside>
+    <section className="admin-main">
+      <header className="admin-header"><div><small>CONSOLA DEL DIRECTOR</small><h1>{player?(save.identity?.name||'@'+player.username):'Selecciona una partida'}</h1></div><div className="admin-status"><i/> ADMIN ACTIVO</div></header>
+      {notice&&<div className="admin-notice">{notice}</div>}
+      {!player?<div className="admin-empty large">Selecciona un jugador para empezar.</div>:<>
+        <nav className="admin-tabs">{[['overview','Resumen'],['characters','Personajes'],['events','Eventos'],['director','Director IA']].map(([k,l])=><button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>{l}</button>)}</nav>
+
+        {tab==='overview'&&<div className="admin-grid">
+          <section className="admin-card admin-wide"><div className="admin-card-head"><span>ESTADO DE PARTIDA</span><button onClick={()=>loadPlayer(player.id)}>Actualizar</button></div><div className="admin-kpis"><div><b>{chars.length}</b><span>Personajes</span></div><div><b>{events.filter(x=>x.status!=='cerrado').length}</b><span>Eventos abiertos</span></div><div><b>{Object.keys(save.profile||{}).length}</b><span>Variables</span></div></div></section>
+          <section className="admin-card"><div className="admin-card-head"><span>JUGADOR</span></div><dl className="admin-dl"><div><dt>Usuario</dt><dd>@{player.username}</dd></div><div><dt>Nombre</dt><dd>{save.identity?.name||'—'}</dd></div><div><dt>Edad</dt><dd>{save.identity?.age||'—'}</dd></div><div><dt>Ciudad</dt><dd>{save.identity?.city||'—'}</dd></div><div><dt>Ocupación</dt><dd>{save.identity?.occupation||'—'}</dd></div></dl></section>
+          <section className="admin-card"><div className="admin-card-head"><span>ACTIVIDAD</span></div><dl className="admin-dl"><div><dt>Último acceso</dt><dd>{fmt(player.lastLoginAt)}</dd></div><div><dt>Último guardado</dt><dd>{fmt(player.updatedAt)}</dd></div><div><dt>Alta</dt><dd>{fmt(player.createdAt)}</dd></div></dl></section>
+          <section className="admin-card admin-wide"><div className="admin-card-head"><span>VARIABLES OCULTAS DEL JUGADOR</span><button disabled={busy} onClick={()=>persist(save,'Variables del jugador ajustadas')}>Guardar</button></div><div className="admin-traits">{Object.entries(save.profile||{}).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=><label key={k}><span>{k.replaceAll('_',' ')}</span><input type="range" min="0" max="100" value={Number(v)||0} onChange={e=>localEdit(next=>{next.profile={...(next.profile||{}),[k]:Number(e.target.value)}})}/><b>{Number(v)||0}</b></label>)}{!Object.keys(save.profile||{}).length&&<div className="admin-empty">El jugador todavía no ha completado su perfil.</div>}</div></section>
+        </div>}
+
+        {tab==='characters'&&<div className="admin-character-layout">
+          <section className="admin-card admin-character-list"><div className="admin-card-head"><span>PERSONAJES</span><button onClick={()=>addCharacter()}>+ Añadir</button></div>
+            {chars.map(c=><button key={c.id} className={'admin-character-row '+(character?.id===c.id?'active':'')} onClick={()=>setCharId(c.id)}><span className="admin-avatar">{(c.name||'?').slice(0,1).toUpperCase()}</span><span><b>{c.name||'Sin nombre'}</b><small>{c.status||'activo'} · {c.origin||'procedural'}</small></span></button>)}
+            {!chars.length&&<div className="admin-empty">No hay NPC todavía. Créalo aquí o desde Director IA.</div>}
+          </section>
+          <section className="admin-card admin-character-sheet">{!character?<div className="admin-empty large">Selecciona o crea un personaje.</div>:<>
+            <div className="admin-card-head"><span>FICHA MAESTRA</span><button disabled={busy} onClick={()=>persist(save,'Ficha de '+character.name+' modificada')}>Guardar ficha</button></div>
+            <div className="admin-form-grid">
+              <label>Nombre<input value={character.name||''} onChange={e=>patchCharacter({name:e.target.value})}/></label>
+              <label>Edad<input type="number" min="18" value={character.age||18} onChange={e=>patchCharacter({age:Math.max(18,Number(e.target.value)||18)})}/></label>
+              <label>Estado<select value={character.status||'activo'} onChange={e=>patchCharacter({status:e.target.value})}><option value="activo">Activo</option><option value="oculto">Oculto</option><option value="retirado">Retirado</option></select></label>
+              <label>Origen<select value={character.origin||'procedural'} onChange={e=>patchCharacter({origin:e.target.value})}><option value="procedural">Procedural</option><option value="director">Director</option><option value="importado">Importado</option></select></label>
+              <label>Rol narrativo<input value={character.role||''} onChange={e=>patchCharacter({role:e.target.value})}/></label>
+              <label>Profesión<input value={character.occupation||''} onChange={e=>patchCharacter({occupation:e.target.value})}/></label>
+              <label>Ubicación<input value={character.location||''} onChange={e=>patchCharacter({location:e.target.value})}/></label>
+            </div>
+            {[['appearance','Apariencia real / referencia visual'],['personality','Personalidad'],['communication','Forma de comunicarse'],['objectives','Objetivos'],['boundaries','Límites'],['secrets','Secretos'],['notes','Notas privadas del Director']].map(([k,l])=><label className="admin-textarea" key={k}>{l}<textarea value={character[k]||''} onChange={e=>patchCharacter({[k]:e.target.value})}/></label>)}
+            <div className="admin-card-head sub"><span>PARÁMETROS</span></div><div className="admin-traits">{TRAITS.map(t=><label key={t}><span>{t}</span><input type="range" min="0" max="100" value={character.traits?.[t]??50} onChange={e=>patchTrait(t,e.target.value)}/><b>{character.traits?.[t]??50}</b></label>)}</div>
+          </>}</section>
+        </div>}
+
+        {tab==='events'&&<div className="admin-grid">
+          <section className="admin-card admin-wide"><div className="admin-card-head"><span>NUEVO EVENTO</span></div><textarea className="admin-event-input" value={eventDraft} onChange={e=>setEventDraft(e.target.value)} placeholder="Ej.: Si pasan tres días sin hablar, Claudia toma la iniciativa."/><button className="admin-primary" disabled={!eventDraft.trim()||busy} onClick={()=>addEvent()}>Programar evento</button></section>
+          <section className="admin-card admin-wide"><div className="admin-card-head"><span>COLA NARRATIVA</span></div><div className="admin-event-list">{events.map(ev=><div key={ev.id} className="admin-event"><div><b>{ev.description}</b><small>{fmt(ev.createdAt)} · {ev.trigger||'manual'}</small></div><select value={ev.status||'pendiente'} onChange={e=>localEdit(next=>{next.world.events=next.world.events.map(x=>x.id===ev.id?{...x,status:e.target.value}:x)})}><option value="pendiente">Pendiente</option><option value="activo">Activo</option><option value="cerrado">Cerrado</option></select></div>)}{!events.length&&<div className="admin-empty">No hay eventos programados.</div>}</div><button className="admin-primary secondary" disabled={busy} onClick={()=>persist(save,'Estados de eventos actualizados')}>Guardar estados</button></section>
+        </div>}
+
+        {tab==='director'&&<section className="admin-card admin-director"><div className="admin-card-head"><span>DIRECTOR IA · @{player.username}</span></div><div className="admin-chat">{chat.map((m,i)=><div key={i} className={'admin-message '+m.role}><b>{m.role==='ai'?'DIRECTOR AI':'ADMIN'}</b><p>{m.text}</p></div>)}</div><form className="admin-chat-form" onSubmit={sendDirector}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} placeholder="Ej.: Ponte al día · Crea personaje llamado Irene · Programa evento: ..."/><button disabled={!chatDraft.trim()||busy}>Enviar</button></form></section>}
+      </>}
+    </section>
+  </main>
+}
