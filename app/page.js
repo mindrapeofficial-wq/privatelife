@@ -229,7 +229,14 @@ function PhoneHome({identity,datingApps,appStore,authUser,logout,onInstallApp}){
      <PhoneApp dock cssIcon="safari" name="" onOpen={()=>setOpened('Safari')}/>
      <PhoneApp dock cssIcon="music" name="" onOpen={()=>setOpened('Música')}/>
    </div>
-   {opened&&<AppWindow name={opened} onClose={()=>setOpened(null)} authUser={authUser} logout={logout}/>}
+   {opened==='App Store'
+     ? <PhoneAppStore
+         installed={normalizeAppStore(appStore,datingApps).installed}
+         onInstall={onInstallApp}
+         onOpenApp={name=>setOpened(name)}
+         onClose={()=>setOpened(null)}
+       />
+     : opened&&<AppWindow name={opened} onClose={()=>setOpened(null)} authUser={authUser} logout={logout}/>}
  </div>
 }
 function PhoneApp({src,name,onOpen,dock=false,cssIcon='',brand=false}){
