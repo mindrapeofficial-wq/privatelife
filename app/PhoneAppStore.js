@@ -260,6 +260,10 @@ export default function PhoneAppStore({installed=[],onInstall,onOpenApp,onClose}
           <div className="store-section-head"><div><small>PARA TI</small><h3>Descubre nuevas posibilidades</h3></div></div>
           {APP_STORE_CATALOG.filter(a=>a.featured).map(app=><AppRow key={app.id} app={app} installed={installedSet.has(app.id)} pending={pending===app.id} onAction={action} onDetails={setDetail}/>)}
         </section>
+        {APP_STORE_CATALOG.some(a=>a.available&&!a.featured&&!installedSet.has(a.id))&&<section className="store-section">
+          <div className="store-section-head"><div><small>VOLVER A DESCARGAR</small><h3>Apps que has quitado</h3></div></div>
+          {APP_STORE_CATALOG.filter(a=>a.available&&!a.featured&&!installedSet.has(a.id)).map(app=><AppRow key={app.id} app={app} installed={false} pending={pending===app.id} onAction={action} onDetails={setDetail}/>)}
+        </section>}
         <section className="store-section">
           <div className="store-section-head"><div><small>PRÓXIMAMENTE</small><h3>Más capas para Private Life</h3></div></div>
           {APP_STORE_CATALOG.filter(a=>!a.available).map(app=><AppRow key={app.id} app={app} installed={installedSet.has(app.id)} pending={pending===app.id} onAction={action} onDetails={setDetail}/>)}
