@@ -7,9 +7,12 @@ function cleanMessage(value) {
   return String(value || '').replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]').slice(0, 500);
 }
 
-export async function GET() {
+export async function GET(request) {
   try {
-    if (!(await isCurrentAdmin())) {
+    const probeToken = process.env.OPENAI_HEALTH_TOKEN || '';
+    const suppliedToken = request.nextUrl.searchParams.get('token') || '';
+    const probeAllowed = Boolean(probeToken) && suppliedToken === probeToken;
+    if (!probeAllowed && !(await isCurrentAdmin())) {
       return NextResponse.json({ error: 'No autorizado.' }, { status: 403 });
     }
 
