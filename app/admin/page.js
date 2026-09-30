@@ -637,6 +637,9 @@ export default function AdminPage(){
                 <div><dt>Contactos</dt><dd>{aiRun?.context?.counts?.contacts??'—'}</dd></div>
                 <div><dt>Personajes mundo</dt><dd>{aiRun?.context?.counts?.worldCharacters??chars.length}</dd></div>
                 <div><dt>Eventos abiertos</dt><dd>{aiRun?.context?.counts?.openEvents??events.filter(x=>x.status!=='cerrado').length}</dd></div>
+                <div><dt>Vínculos NPC↔NPC</dt><dd>{aiRun?.context?.counts?.socialEdges??socialEdges.length}</dd></div>
+                <div><dt>Eventos sociales</dt><dd>{aiRun?.context?.counts?.recentSocialEvents??socialEvents.length}</dd></div>
+                <div><dt>Información activa</dt><dd>{aiRun?.context?.counts?.activeInformation??socialInformation.length}</dd></div>
               </dl>
             </div>
 
@@ -662,6 +665,8 @@ export default function AdminPage(){
                 <div><b>{aiPlan.newCharacters?.length||0}</b><span>Nuevos personajes</span></div>
                 <div><b>{aiPlan.events?.length||0}</b><span>Eventos</span></div>
                 <div><b>{aiPlan.messages?.length||0}</b><span>Mensajes</span></div>
+                <div><b>{aiPlan.socialActions?.length||0}</b><span>Acciones sociales</span></div>
+                <div><b>{aiPlan.informationActions?.length||0}</b><span>Movimientos info</span></div>
                 <div><b>{aiActionCount}</b><span>Acciones totales</span></div>
               </div>
             </div>
@@ -673,6 +678,8 @@ export default function AdminPage(){
               {(aiPlan.newCharacters||[]).map((x,i)=><article key={'nc'+i}><span className="kind">PERSONAJE</span><div><b>{x.name||'Nuevo personaje'}</b><p>{x.role||x.occupation||'Creación procedural por World Director'}</p></div></article>)}
               {(aiPlan.characterUpdates||[]).map((x,i)=><article key={'cu'+i}><span className="kind">CAMBIO</span><div><b>{x.name||x.id||'Personaje'}</b><p>{Object.keys(x.patch||{}).join(', ')||'Actualización de ficha'}</p></div></article>)}
               {(aiPlan.relationshipUpdates||[]).map((x,i)=><article key={'ru'+i}><span className="kind">RELACIÓN</span><div><b>{x.name||x.id||'Personaje'}</b><p>{Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · ')||'Sin cambios'}</p></div></article>)}
+              {(aiPlan.socialActions||[]).map((x,i)=><article key={'sa'+i}><span className="kind">SOCIAL</span><div><b>{x.actorKey||'NPC'} ↔ {x.targetKey||'NPC'}</b><p>{x.summary||x.type||'Interacción social'}{Object.keys(x.deltas||{}).length?' · '+Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · '):''}</p></div></article>)}
+              {(aiPlan.informationActions||[]).map((x,i)=><article key={'ia'+i}><span className="kind">INFO</span><div><b>{x.action==='share'?'Difusión':'Nueva información'} · {x.infoKey||'sin clave'}</b><p>{x.content||x.summary||x.reason||[x.fromKey,x.toKey].filter(Boolean).join(' → ')||'Movimiento de información social'}</p></div></article>)}
               {(aiPlan.events||[]).map((x,i)=><article key={'ev'+i}><span className="kind">EVENTO</span><div><b>{x.title||x.type||'Evento'}</b><p>{x.reason||x.body||''}{x.delayMinutes!=null?' · en '+x.delayMinutes+' min':''}</p></div></article>)}
               {(aiPlan.messages||[]).map((x,i)=><article key={'msg'+i}><span className="kind">MENSAJE</span><div><b>{x.contactName||'Contacto'}</b><p>{x.reason||x.text||''}{x.delayMinutes!=null?' · en '+x.delayMinutes+' min':''}</p></div></article>)}
               {!aiActionCount&&<div className="admin-empty">La IA decidió no ejecutar ninguna acción en este ciclo. El silencio también es una decisión del motor.</div>}
@@ -682,7 +689,7 @@ export default function AdminPage(){
           <section className="admin-card admin-ai-history">
             <div className="admin-card-head"><span>HISTORIAL DE CICLOS</span><button onClick={()=>loadAiMind(player.id)} disabled={aiMindBusy}>Actualizar</button></div>
             <div className="admin-ai-run-list">
-              {aiRuns.map(run=><button key={run.id} className={String(aiRun?.id)===String(run.id)?'active':''} onClick={()=>setAiMindSelectedRun(String(run.id))}><span><b>{fmt(run.gameAt)}</b><small>{run.queuedEvents} eventos · {run.queuedMessages} mensajes</small></span><p>{run.summary||'Sin resumen'}</p></button>)}
+              {aiRuns.map(run=><button key={run.id} className={String(aiRun?.id)===String(run.id)?'active':''} onClick={()=>setAiMindSelectedRun(String(run.id))}><span><b>{fmt(run.gameAt)}</b><small>{run.queuedEvents} eventos · {run.queuedMessages} mensajes · {(run.plan?.socialActions?.length||0)} sociales</small></span><p>{run.summary||'Sin resumen'}</p></button>)}
               {!aiRuns.length&&<div className="admin-empty">Todavía no hay ciclos autónomos guardados.</div>}
             </div>
           </section>
