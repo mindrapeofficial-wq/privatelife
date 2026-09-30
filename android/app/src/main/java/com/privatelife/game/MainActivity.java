@@ -51,6 +51,7 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> pendingFileCallback;
     private String pendingGeolocationOrigin;
     private GeolocationPermissions.Callback pendingGeolocationCallback;
+    private boolean pageFinished = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -155,7 +156,7 @@ public class MainActivity extends Activity {
     }
 
     private void syncNativePushWithPage() {
-        if (webView == null) {
+        if (webView == null || !pageFinished) {
             return;
         }
 
@@ -293,6 +294,12 @@ public class MainActivity extends Activity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                pageFinished = false;
+                super.onPageStarted(view, url, favicon);
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme();
@@ -314,6 +321,7 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                pageFinished = true;
                 injectNativeFullscreenFix();
                 syncNativePushWithPage();
                 CookieManager.getInstance().flush();
