@@ -58,7 +58,8 @@ export default function PhoneNotifications(){
         const contacts=JSON.parse(localStorage.getItem(CONTACTS)||'[]');
         const adults=(Array.isArray(contacts)?contacts:[]).filter(c=>c?.id&&c?.name&&Number(c?.age)>=18).slice(0,200).map(c=>({
           id:c.id,name:c.name,age:c.age,city:c.city,relationshipType:c.relationshipType,relation:c.relation,
-          affection:c.affection,profile:c.profile,engineContext:c.engineContext,masterSheet:c.masterSheet
+          affection:c.affection,profile:c.profile,engineContext:c.engineContext,masterSheet:c.masterSheet,
+          sourceType:c.sourceType,isAI:c.isAI===true,npcId:c.npcId||null,npcConfigSnapshot:c.npcConfigSnapshot||null
         }));
         if(!adults.length)return;
         const response=await fetch('/api/whatsapp',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'poll',contacts:adults})});
@@ -89,10 +90,18 @@ export default function PhoneNotifications(){
     async function backgroundLifePoll(){
       try{
         const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+        const rawContacts=JSON.parse(localStorage.getItem(CONTACTS)||'[]');
+        const contacts=(Array.isArray(rawContacts)?rawContacts:[]).filter(c=>c?.id&&c?.name&&Number(c?.age)>=18).slice(0,200).map(c=>({
+          id:c.id,name:c.name,age:c.age,city:c.city,relationshipType:c.relationshipType,relation:c.relation,
+          affection:c.affection,profile:c.profile,sourceType:c.sourceType,isAI:c.isAI===true,
+          npcId:c.npcId||null,npcConfigSnapshot:c.npcConfigSnapshot||null
+        }));
         const response=await fetch('/api/life/tick?timezone='+encodeURIComponent(timezone),{
+          method:'POST',
           cache:'no-store',
           credentials:'same-origin',
-          headers:{Accept:'application/json'}
+          headers:{Accept:'application/json','content-type':'application/json'},
+          body:JSON.stringify({contacts})
         });
         if(!response.ok)return;
         const data=await response.json();
