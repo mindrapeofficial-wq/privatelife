@@ -2,9 +2,12 @@ package com.privatelife.game;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -30,6 +33,10 @@ public class MainActivity extends Activity {
     private static final String APP_HOST = "private-life-04pu.onrender.com";
     private static final int FILE_CHOOSER_REQUEST = 5011;
     private static final int LOCATION_PERMISSION_REQUEST = 5012;
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 5013;
+    private static final String NATIVE_PREFS = "private_life_native";
+    private static final String PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked";
+    private static final String NOTIFICATION_CHANNEL_ID = "private_life_events";
 
     private WebView webView;
     private ValueCallback<Uri[]> pendingFileCallback;
@@ -42,6 +49,8 @@ public class MainActivity extends Activity {
 
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         enableImmersiveMode();
+        createNotificationChannel();
+        requestNotificationPermissionOnFirstLaunch();
 
         webView = new WebView(this);
         webView.setBackgroundColor(Color.rgb(8, 9, 13));
@@ -54,6 +63,48 @@ public class MainActivity extends Activity {
         } else {
             webView.loadUrl(START_URL);
         }
+    }
+
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID,
+                    "Eventos de PRIVATE LIFE",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            channel.setDescription("Mensajes, llamadas, eventos y avisos del teléfono del juego.");
+
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+    }
+
+    private void requestNotificationPermissionOnFirstLaunch() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
+        }
+
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        SharedPreferences prefs = getSharedPreferences(NATIVE_PREFS, MODE_PRIVATE);
+        if (prefs.getBoolean(PREF_NOTIFICATION_PERMISSION_ASKED, false)) {
+            return;
+        }
+
+        prefs.edit()
+                .putBoolean(PREF_NOTIFICATION_PERMISSION_ASKED, true)
+                .apply();
+
+        requestPermissions(
+                new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                NOTIFICATION_PERMISSION_REQUEST
+        );
     }
 
     private void configureWebView() {
@@ -311,6 +362,22 @@ public class MainActivity extends Activity {
             int[] grantResults
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+            boolean granted =
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                    || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                    == PackageManager.PERMISSION_GRANTED;
+
+            if (!granted) {
+                Toast.makeText(
+                        this,
+                        "Puedes activar las notificaciones después en Ajustes > Apps > PRIVATE LIFE > Notificaciones.",
+                        Toast.LENGTH_LONG
+                ).show();
+            }
+            return;
+        }
 
         if (requestCode == LOCATION_PERMISSION_REQUEST && pendingGeolocationCallback != null) {
             boolean granted =
