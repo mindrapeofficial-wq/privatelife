@@ -141,7 +141,37 @@ export default function Home(){
  async function persistGame(save){await apiRequest('/api/save',{method:'PUT',body:JSON.stringify({save})})}
  async function loadGame(username){let data;try{data=await apiRequest('/api/save',{cache:'no-store'})}catch(error){throw error}let saved=data.save;if(!saved){const legacyRaw=localStorage.getItem(saveKey(username))||localStorage.getItem('private-life-save');if(legacyRaw){try{saved=JSON.parse(legacyRaw);await persistGame(saved);localStorage.removeItem(saveKey(username));localStorage.removeItem('private-life-save')}catch{}}}if(saved){applyGameSave(saved);if(saved.profile){try{const locationData=await apiRequest('/api/life/location',{cache:'no-store'});if(!locationData?.configured)setStep('location')}catch{setStep('location')}}}else resetGame()}
  useEffect(()=>{let cancelled=false;(async()=>{try{const data=await apiRequest('/api/auth/me',{cache:'no-store'});if(cancelled)return;if(data.user?.role==='admin'){window.location.replace('/admin');return}const username=data.user?.username;if(username){setAuthUser(username);await loadGame(username)}}catch{if(!cancelled){setAuthUser(null);resetGame()}}finally{if(!cancelled)setAuthReady(true)}})();return()=>{cancelled=true}},[]);
- useEffect(()=>{if(!authUser)return;const prev=phoneTelemetryRef.current;let event=null;if(prev.step!==null&&prev.step!==step)event={type:'screen_change',label:step};if(step==='lock'&&prev.unlocked!==null&&prev.unlocked!==unlocked)event={type:unlocked?'unlock':'lock',label:unlocked?'Teléfono desbloqueado':'Pantalla bloqueada'};phoneTelemetryRef.current={step,unlocked};const send=(ev=null)=>trackPhone({route:window.location.pathname,stage:step,locked:step==='lock'&&!unlocked,unlocked:step==='lock'?unlocked:false,visibility:document.visibilityState,lastSeen:new Date().toISOString()},ev);send(event);const onVisibility=()=>send({type:'visibility',label:document.visibilityState==='visible'?'Juego visible':'Juego en segundo plano'});document.addEventListener('visibilitychange',onVisibility);const id=setInterval(()=>send(),5000);return()=>{clearInterval(id);document.removeEventListener('visibilitychange',onVisibility)}},[authUser,step,unlocked]);
+ useEffect(()=>{
+    if(!authUser)return;
+    let cancelled=false;
+    const pushEnabled=()=>{
+      try{
+        const prefs=JSON.parse(localStorage.getItem('private-life-phone-settings-v1')||'{}');
+        return prefs?.notifications!==false;
+      }catch{return true}
+    };
+    const sync=async token=>{
+      const clean=String(token||'').trim();
+      if(!clean||cancelled)return;
+      try{
+        await apiRequest('/api/push/register',{
+          method:'POST',
+          body:JSON.stringify({token:clean,platform:'android',enabled:pushEnabled()})
+        });
+      }catch{}
+    };
+    const onToken=e=>sync(e?.detail?.token||window.__PRIVATE_LIFE_PUSH_TOKEN__);
+    const onSettings=()=>sync(window.__PRIVATE_LIFE_PUSH_TOKEN__);
+    sync(window.__PRIVATE_LIFE_PUSH_TOKEN__);
+    window.addEventListener('private-life:native-push-token',onToken);
+    window.addEventListener('private-life:settings-changed',onSettings);
+    return()=>{
+      cancelled=true;
+      window.removeEventListener('private-life:native-push-token',onToken);
+      window.removeEventListener('private-life:settings-changed',onSettings);
+    };
+  },[authUser]);
+  useEffect(()=>{if(!authUser)return;const prev=phoneTelemetryRef.current;let event=null;if(prev.step!==null&&prev.step!==step)event={type:'screen_change',label:step};if(step==='lock'&&prev.unlocked!==null&&prev.unlocked!==unlocked)event={type:unlocked?'unlock':'lock',label:unlocked?'Teléfono desbloqueado':'Pantalla bloqueada'};phoneTelemetryRef.current={step,unlocked};const send=(ev=null)=>trackPhone({route:window.location.pathname,stage:step,locked:step==='lock'&&!unlocked,unlocked:step==='lock'?unlocked:false,visibility:document.visibilityState,lastSeen:new Date().toISOString()},ev);send(event);const onVisibility=()=>send({type:'visibility',label:document.visibilityState==='visible'?'Juego visible':'Juego en segundo plano'});document.addEventListener('visibilitychange',onVisibility);const id=setInterval(()=>send(),5000);return()=>{clearInterval(id);document.removeEventListener('visibilitychange',onVisibility)}},[authUser,step,unlocked]);
  async function login(){setAuthError('');if(!authForm.username.trim()||!authForm.password){setAuthError('Escribe tu usuario y contraseña.');return}setAuthBusy(true);try{let data;try{data=await apiRequest('/api/auth/login',{method:'POST',body:JSON.stringify({username:authForm.username,password:authForm.password})})}catch(serverError){const legacy=await verifiedLegacyAccount(authForm.username,authForm.password);if(!legacy)throw serverError;if(authForm.password.length<8)throw new Error('Cuenta local detectada. Para migrarla a Neon necesitas establecer una contraseña de al menos 8 caracteres.');data=await apiRequest('/api/auth/register',{method:'POST',body:JSON.stringify({username:legacy.account.username||authForm.username.trim(),password:authForm.password})});clearLegacyAccount(legacy.key,legacy.users)}if(data.user?.role==='admin'){window.location.assign('/admin');return}const username=data.user.username;setAuthUser(username);setAuthForm({username:'',password:'',repeat:''});await loadGame(username)}catch(error){setAuthError(error.message)}finally{setAuthBusy(false)}}
  async function register(){setAuthError('');const username=authForm.username.trim();if(username.length<3){setAuthError('El usuario debe tener al menos 3 caracteres.');return}if(!/^[a-zA-Z0-9._-]+$/.test(username)){setAuthError('Usa letras, números, punto, guion o guion bajo.');return}if(authForm.password.length<8){setAuthError('La contraseña debe tener al menos 8 caracteres.');return}if(authForm.password!==authForm.repeat){setAuthError('Las contraseñas no coinciden.');return}setAuthBusy(true);try{const legacyUsers=readLegacyUsers(),legacyKey=username.toLowerCase(),legacyAccount=legacyUsers[legacyKey];if(legacyAccount){const legacy=await verifiedLegacyAccount(username,authForm.password);if(!legacy)throw new Error('Ese usuario ya existe localmente. Introduce su contraseña original para migrarlo a Neon.');const data=await apiRequest('/api/auth/register',{method:'POST',body:JSON.stringify({username:legacy.account.username||username,password:authForm.password})});clearLegacyAccount(legacy.key,legacy.users);setAuthUser(data.user.username);setAuthForm({username:'',password:'',repeat:''});await loadGame(data.user.username);return}const data=await apiRequest('/api/auth/register',{method:'POST',body:JSON.stringify({username,password:authForm.password})});setAuthUser(data.user.username);setAuthForm({username:'',password:'',repeat:''});resetGame()}catch(error){setAuthError(error.message)}finally{setAuthBusy(false)}}
  async function logout(){await trackPhone({visibility:'offline',lastSeen:new Date().toISOString()},{type:'logout',label:'Sesión cerrada'});try{await apiRequest('/api/auth/logout',{method:'POST',body:'{}'})}catch{}setAuthUser(null);setAuthMode('login');setAuthForm({username:'',password:'',repeat:''});setAuthError('');resetGame()}
