@@ -30,3 +30,21 @@ CREATE TABLE IF NOT EXISTS private_life.game_saves (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS private_life.phone_state (
+  user_id BIGINT PRIMARY KEY REFERENCES private_life.users(id) ON DELETE CASCADE,
+  state_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS private_life.phone_activity (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES private_life.users(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  event_label TEXT,
+  event_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS private_life_phone_activity_user_created_idx
+  ON private_life.phone_activity(user_id, created_at DESC);
