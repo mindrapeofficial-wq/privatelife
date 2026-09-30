@@ -511,3 +511,32 @@
 .admin-ai-health.ok b{color:#55d6a3}
 .admin-ai-health.bad{border-color:#663232;background:#211010}
 .admin-ai-health.bad b{color:#ff8585}
+
+
+/* Life Engine v1 · structured NPC routines */
+.plai-routine-top{display:grid;gap:12px}
+.plai-routine-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.plai-routine-summary span{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.045);font-size:12px;color:#aeb7c6}
+.plai-routine-summary b{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#e9eef7}
+.plai-routine-generate,.plai-routine-add{border:0;border-radius:12px;padding:11px 14px;background:rgba(117,92,255,.16);color:#dcd6ff;font-weight:700;cursor:pointer}
+.plai-routine-days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:14px 0 10px}
+.plai-routine-days button{border:0;border-radius:10px;padding:9px 0;background:rgba(255,255,255,.045);color:#9ca7b8;font-weight:800;cursor:pointer}
+.plai-routine-days button.active{background:#755cff;color:white}
+.plai-routine-blocks{display:grid;gap:10px}
+.plai-routine-block{padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(8,12,20,.42)}
+.plai-routine-times{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px}
+.plai-routine-times label,.plai-routine-fields label{display:grid;gap:5px}
+.plai-routine-times span,.plai-routine-fields span{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#8590a2}
+.plai-routine-times input,.plai-routine-fields input,.plai-routine-fields select{width:100%;box-sizing:border-box;border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:9px 10px;background:#111722;color:#edf2fa}
+.plai-routine-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.plai-routine-remove{margin-top:9px;border:0;background:transparent;color:#ff8d9a;font-size:12px;cursor:pointer}
+.admin-routine-card{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:14px 0;padding:14px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:rgba(117,92,255,.08)}
+.admin-routine-card>div{display:grid;gap:5px}
+.admin-routine-card b{font-size:11px;letter-spacing:.08em}
+.admin-routine-card span{font-size:12px;color:#aab4c4}
+.admin-routine-card button{border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 11px;background:rgba(255,255,255,.06);color:#fff;cursor:pointer}
+@media(max-width:640px){
+  .plai-routine-summary{grid-template-columns:1fr}
+  .plai-routine-fields{grid-template-columns:1fr}
+  .admin-routine-card{align-items:flex-start;flex-direction:column}
+}
