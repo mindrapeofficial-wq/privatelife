@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 
 const STORAGE='private-life-notifications-v1';
 const INTRO='private-life-notifications-intro-v1';
+const PHONE_SETTINGS='private-life-phone-settings-v1';
 const MAX_NOTIFICATIONS=60;
 
 const appGlyphs={
@@ -15,6 +16,7 @@ const appGlyphs={
 function normalize(value=''){
   return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
 }
+function phonePrefs(){try{return {notifications:true,vibration:true,previews:true,...JSON.parse(localStorage.getItem(PHONE_SETTINGS)||'{}')}}catch{return {notifications:true,vibration:true,previews:true}}}
 function load(){
   try{const value=JSON.parse(localStorage.getItem(STORAGE)||'[]');return Array.isArray(value)?value.slice(0,MAX_NOTIFICATIONS):[]}catch{return []}
 }
@@ -49,16 +51,18 @@ export default function PhoneNotifications(){
   useEffect(()=>{
     const notify=(input={})=>{
       const detail=input?.detail||input||{};
+      const prefs=phonePrefs();
+      if(prefs.notifications===false)return;
       const item={
         id:detail.id||crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,
         app:String(detail.app||'PRIVATE LIFE'),title:String(detail.title||detail.app||'PRIVATE LIFE'),
-        body:String(detail.body||detail.message||''),icon:detail.icon||'',href:detail.href||'',
+        body:prefs.previews===false?'':String(detail.body||detail.message||''),icon:detail.icon||'',href:detail.href||'',
         createdAt:detail.createdAt||new Date().toISOString(),read:false,priority:detail.priority||'normal',
         data:detail.data&&typeof detail.data==='object'?detail.data:{}
       };
       setItems(current=>[item,...current.filter(n=>n.id!==item.id)].slice(0,MAX_NOTIFICATIONS));
       setBanner(item.id);
-      if(detail.vibrate!==false&&navigator.vibrate)navigator.vibrate([45,35,45]);
+      if(prefs.vibration!==false&&detail.vibrate!==false&&navigator.vibrate)navigator.vibrate([45,35,45]);
       window.dispatchEvent(new CustomEvent('private-life:notification-received',{detail:item}));
     };
     window.privateLifeNotify=notify;
