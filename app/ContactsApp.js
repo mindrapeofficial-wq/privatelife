@@ -134,7 +134,14 @@ export default function ContactsApp({onClose}){
  </div>;
 }
 
-function NativeBar({left,onLeft,title,right,onRight,rightDisabled=false}){return <div className="nc-nav"><button className="nc-nav-left" onClick={onLeft}>{left}</button><b>{title}</b><button className="nc-nav-right" disabled={rightDisabled} onClick={onRight}>{right}</button></div>}
+function NativeBar({left,onLeft,title,right,onRight,rightDisabled=false}){
+ const backOnly=left==='‹',addOnly=right==='+';
+ return <div className="nc-nav">
+   <button className={'nc-nav-left '+(backOnly?'nc-nav-icon nc-nav-back':'nc-nav-text')} aria-label={backOnly?'Volver':left||'Volver'} onClick={onLeft}>{backOnly?<span aria-hidden="true">‹</span>:left}</button>
+   <b>{title}</b>
+   <button className={'nc-nav-right '+(addOnly?'nc-nav-icon nc-nav-add':'nc-nav-text')} aria-label={addOnly?'Añadir contacto':right||''} disabled={rightDisabled} onClick={onRight}>{addOnly?<span aria-hidden="true">+</span>:right}</button>
+ </div>
+}
 function Group({title,children}){return <section className="nc-group-wrap">{title&&<div className="nc-group-title">{title}</div>}<div className="nc-group">{children}</div></section>}
 function Field({label,value,set,type='text'}){return <label className="nc-field"><span>{label}</span><input type={type} value={value} onChange={e=>set(e.target.value)}/></label>}
 function Select({label,value,set,options}){return <label className="nc-field"><span>{label}</span><select value={value} onChange={e=>set(e.target.value)}>{options.map(x=><option key={x}>{x}</option>)}</select></label>}
