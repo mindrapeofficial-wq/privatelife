@@ -49,6 +49,10 @@ export async function GET(request) {
       END AS game_now
       FROM private_life.world_clock WHERE user_id=$1 LIMIT 1`,[userId]);
     const clock=clockResult.rows[0]||{speed:1,paused:false,timezone:'UTC',game_now:new Date()};
+    const [playerContextResult,lifeEventsResult]=await Promise.all([
+      query('SELECT location_key,location_label,activity_key,activity_label,availability,social_exposure,privacy,started_game_at,expected_until_game_at,revision,last_evaluated_game_at,next_evaluation_game_at,updated_at FROM private_life.player_context WHERE user_id=$1 LIMIT 1',[userId]),
+      query("SELECT id,event_key,event_type,app,title,body,payload,scheduled_game_at,status,created_at,delivered_at FROM private_life.life_events WHERE user_id=$1 ORDER BY created_at DESC LIMIT 80",[userId])
+    ]);
     const save=row.save_data||{};
     const lifeCharacters=(Array.isArray(save?.world?.characters)?save.world.characters:[]).map(character=>({
       id:String(character?.id||''),
@@ -95,6 +99,11 @@ export async function GET(request) {
           timezone:clock.timezone||'UTC',
           speed:Number(clock.speed)||1,
           paused:!!clock.paused,
+          context:playerContextResult.rows[0]||null,
+          events:lifeEventsResult.rows.map(e=>({
+            id:String(e.id),key:e.event_key,type:e.event_type,app:e.app,title:e.title,body:e.body,
+            payload:e.payload||{},scheduledGameAt:e.scheduled_game_at,status:e.status,createdAt:e.created_at,deliveredAt:e.delivered_at
+          })),
           characters:lifeCharacters,
         },
       },
