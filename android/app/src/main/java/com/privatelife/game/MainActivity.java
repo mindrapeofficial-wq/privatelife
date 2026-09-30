@@ -1,8 +1,10 @@
 package com.privatelife.game;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -12,6 +14,7 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.GeolocationPermissions;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -26,9 +29,12 @@ public class MainActivity extends Activity {
     private static final String START_URL = "https://private-life-04pu.onrender.com/";
     private static final String APP_HOST = "private-life-04pu.onrender.com";
     private static final int FILE_CHOOSER_REQUEST = 5011;
+    private static final int LOCATION_PERMISSION_REQUEST = 5012;
 
     private WebView webView;
     private ValueCallback<Uri[]> pendingFileCallback;
+    private String pendingGeolocationOrigin;
+    private GeolocationPermissions.Callback pendingGeolocationCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +61,7 @@ public class MainActivity extends Activity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
+        settings.setGeolocationEnabled(true);
         settings.setAllowContentAccess(true);
         settings.setAllowFileAccess(true);
         settings.setLoadsImagesAutomatically(true);
@@ -83,6 +90,29 @@ public class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(false);
 
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onGeolocationPermissionsShowPrompt(
+                    String origin,
+                    GeolocationPermissions.Callback callback
+            ) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                        || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    callback.invoke(origin, true, false);
+                    return;
+                }
+
+                pendingGeolocationOrigin = origin;
+                pendingGeolocationCallback = callback;
+                requestPermissions(
+                        new String[]{
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                        },
+                        LOCATION_PERMISSION_REQUEST
+                );
+            }
+
             @Override
             public boolean onShowFileChooser(
                     WebView view,
@@ -271,6 +301,29 @@ public class MainActivity extends Activity {
             webView.goBack();
         } else {
             super.onBackPressed();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode,
+            String[] permissions,
+            int[] grantResults
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == LOCATION_PERMISSION_REQUEST && pendingGeolocationCallback != null) {
+            boolean granted =
+                    checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+
+            pendingGeolocationCallback.invoke(
+                    pendingGeolocationOrigin == null ? START_URL : pendingGeolocationOrigin,
+                    granted,
+                    false
+            );
+            pendingGeolocationCallback = null;
+            pendingGeolocationOrigin = null;
         }
     }
 
