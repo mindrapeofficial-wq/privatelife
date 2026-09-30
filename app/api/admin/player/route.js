@@ -50,6 +50,12 @@ export async function GET(request) {
       FROM private_life.world_clock WHERE user_id=$1 LIMIT 1`,[userId]);
     const clock=clockResult.rows[0]||{speed:1,paused:false,timezone:'UTC',game_now:new Date()};
     const save=row.save_data||{};
+    const [autonomyResult,lifeEventsResult]=await Promise.all([
+      query(`SELECT character_key,next_action_game_at,last_action_game_at,daily_key,daily_count,state_data,updated_at
+        FROM private_life.npc_autonomy_state WHERE user_id=$1 ORDER BY next_action_game_at ASC LIMIT 200`,[userId]),
+      query(`SELECT id,character_key,character_name,event_type,channel,event_data,game_at,created_at
+        FROM private_life.life_events WHERE user_id=$1 ORDER BY game_at DESC,id DESC LIMIT 120`,[userId])
+    ]);
     const lifeCharacters=(Array.isArray(save?.world?.characters)?save.world.characters:[]).map(character=>({
       id:String(character?.id||''),
       name:String(character?.name||'Personaje'),
@@ -96,6 +102,25 @@ export async function GET(request) {
           speed:Number(clock.speed)||1,
           paused:!!clock.paused,
           characters:lifeCharacters,
+          autonomy:autonomyResult.rows.map(x=>({
+            characterKey:x.character_key,
+            nextActionGameAt:x.next_action_game_at,
+            lastActionGameAt:x.last_action_game_at,
+            dailyKey:x.daily_key,
+            dailyCount:Number(x.daily_count)||0,
+            state:x.state_data||{},
+            updatedAt:x.updated_at
+          })),
+          recentEvents:lifeEventsResult.rows.map(x=>({
+            id:String(x.id),
+            characterKey:x.character_key,
+            characterName:x.character_name,
+            type:x.event_type,
+            channel:x.channel,
+            data:x.event_data||{},
+            gameAt:x.game_at,
+            createdAt:x.created_at
+          })),
         },
       },
     });
