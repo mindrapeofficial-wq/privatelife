@@ -12,6 +12,10 @@ export async function POST(request) {
     const usernameKey = normalizeUsername(username);
     const password = String(body?.password || '');
 
+    if (usernameKey === normalizeUsername(process.env.ADMIN_USERNAME || 'admin')) {
+      return NextResponse.json({ error: 'Ese nombre de usuario está reservado.' }, { status: 409 });
+    }
+
     if (!validateUsername(username)) {
       return NextResponse.json({ error: 'El usuario debe tener entre 3 y 30 caracteres y usar solo letras, números, punto, guion o guion bajo.' }, { status: 400 });
     }
