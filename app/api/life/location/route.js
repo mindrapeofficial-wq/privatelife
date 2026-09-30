@@ -112,10 +112,15 @@ export async function PUT(request){
       [user.id,source,displayLabel,area,city,region,country,countryCode,latitude,longitude,accuracy,timezone]
     );
 
-    await query(
-      "INSERT INTO private_life.phone_activity (user_id,event_type,event_label,event_data) VALUES($1,'world_location_changed',$2,$3::jsonb)",
-      [user.id,displayLabel,JSON.stringify({source,displayLabel,area,city,region,country,countryCode,latitude,longitude,accuracy,timezone})]
-    );
+    await Promise.all([
+      query(
+        "INSERT INTO private_life.phone_activity (user_id,event_type,event_label,event_data) VALUES($1,'world_location_changed',$2,$3::jsonb)",
+        [user.id,displayLabel,JSON.stringify({source,displayLabel,area,city,region,country,countryCode,latitude,longitude,accuracy,timezone})]
+      ),
+      query("UPDATE private_life.life_events SET status='cancelled' WHERE user_id=$1 AND status='pending'",[user.id]),
+      query("UPDATE private_life.player_context SET next_evaluation_game_at=NOW(),last_evaluated_game_at=NULL,updated_at=NOW() WHERE user_id=$1",[user.id]),
+      query("UPDATE private_life.world_director_state SET next_run_game_at=NOW(),updated_at=NOW() WHERE user_id=$1",[user.id])
+    ]);
 
     return NextResponse.json({ok:true,location:publicLocation(result.rows[0])});
   }catch(error){
