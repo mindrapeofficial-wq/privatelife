@@ -12,13 +12,21 @@ function clock(ts){try{return new Intl.DateTimeFormat('es',{hour:'2-digit',minut
 function todayLabel(ts){const d=new Date(ts||Date.now()),n=new Date(),a=new Date(n.getFullYear(),n.getMonth(),n.getDate()),b=new Date(d.getFullYear(),d.getMonth(),d.getDate()),diff=Math.floor((a-b)/86400000);if(diff===0)return'Hoy';if(diff===1)return'Ayer';return new Intl.DateTimeFormat('es',{day:'numeric',month:'short'}).format(d)}
 function contactsFromStorage(){const list=readJson(CONTACTS_KEY,[]);return Array.isArray(list)?list.filter(c=>c?.id&&c?.name&&Number(c?.age)>=18):[]}
 function Avatar({contact,size='md'}){const photo=contact?.photos?.[0];return photo?<img className={'wa-avatar '+size} src={photo} alt=""/>:<span className={'wa-avatar wa-avatar-fallback '+size}>{String(contact?.name||'?').trim().charAt(0).toUpperCase()}</span>}
+function canonicalName(value=''){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase().replace(/\s+/g,' ')}
 function groupMessages(contacts,messages,previous={}){
  const out={};
- contacts.forEach(c=>{out[c.id]={messages:[],unread:0}});
+ const byName=new Map();
+ contacts.forEach(c=>{
+   out[c.id]={messages:[],unread:0};
+   const key=canonicalName(c.name);
+   if(key&&!byName.has(key))byName.set(key,c.id);
+ });
  messages.forEach(m=>{
-   if(!out[m.contactId])out[m.contactId]={messages:[],unread:0};
-   out[m.contactId].messages.push(m);
-   if(m.side==='in'&&!m.readAt)out[m.contactId].unread+=1;
+   const matchedId=out[m.contactId]?m.contactId:(byName.get(canonicalName(m.contactName))||m.contactId);
+   if(!out[matchedId])out[matchedId]={messages:[],unread:0};
+   const normalized=matchedId===m.contactId?m:{...m,contactId:matchedId};
+   out[matchedId].messages.push(normalized);
+   if(normalized.side==='in'&&!normalized.readAt)out[matchedId].unread+=1;
  });
  return out;
 }
