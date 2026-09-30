@@ -188,7 +188,7 @@ export default function AdminPage(){
   const chars=save.world.characters,events=save.world.events;
   const character=useMemo(()=>chars.find(x=>x.id===charId)||chars[0]||null,[chars,charId]);
   const phone=player?.phone||{state:{},activity:[],whatsapp:[],updatedAt:null},phoneState=phone.state||{},phoneActivity=Array.isArray(phone.activity)?phone.activity:[],phoneWhatsapp=Array.isArray(phone.whatsapp)?phone.whatsapp:[];
-  const life=player?.life||{characters:[],events:[],autonomy:[],autonomyEvents:[],context:null,worldLocation:null,timezone:'UTC',speed:1,paused:false},lifeCharacters=Array.isArray(life.characters)?life.characters:[],lifeEvents=Array.isArray(life.events)?life.events:[],lifeAutonomy=Array.isArray(life.autonomy)?life.autonomy:[],lifeAutonomyEvents=Array.isArray(life.autonomyEvents)?life.autonomyEvents:[],playerContext=life.context||null,worldLocation=life.worldLocation||null;
+  const life=player?.life||{characters:[],events:[],autonomy:[],autonomyEvents:[],memories:[],intentions:[],context:null,worldLocation:null,timezone:'UTC',speed:1,paused:false},lifeCharacters=Array.isArray(life.characters)?life.characters:[],lifeEvents=Array.isArray(life.events)?life.events:[],lifeAutonomy=Array.isArray(life.autonomy)?life.autonomy:[],lifeAutonomyEvents=Array.isArray(life.autonomyEvents)?life.autonomyEvents:[],lifeMemories=Array.isArray(life.memories)?life.memories:[],lifeIntentions=Array.isArray(life.intentions)?life.intentions:[],playerContext=life.context||null,worldLocation=life.worldLocation||null;
   const phoneFresh=phone.updatedAt&&Date.now()-new Date(phone.updatedAt).getTime()<12000&&phoneState.visibility!=='offline';
   const installedPhoneApps=['Instagram','WhatsApp','Facebook',...(save.datingApps?.tinder?['Tinder']:[]),...(save.datingApps?.grindr?['Grindr']:[]),'Contactos','Fotos','Calendario','App Store','Ahora','Notas','Ajustes','Teléfono','Mensajes','Safari','Música'];
   const aiRuns=Array.isArray(aiMind?.runs)?aiMind.runs:[];
@@ -404,6 +404,17 @@ export default function AdminPage(){
             <div className="admin-routine-card">
               <div><b>LIFE ENGINE · RUTINA + AUTONOMÍA</b><span>{(()=>{const live=lifeCharacters.find(x=>String(x.id)===String(character.id));return live?'Ahora: '+live.label+(live.location?' · '+live.location:''):'Estado pendiente de sincronización'})()}</span><span>Laboral: {routineSummary(character.routine,{occupation:character.occupation,city:character.location}).work} · Sueño: {routineSummary(character.routine,{occupation:character.occupation,city:character.location}).sleep}</span><span>{(()=>{const a=lifeAutonomy.find(x=>String(x.characterKey)===('world:'+String(character.id)));return a?.nextActionGameAt?'Próxima iniciativa: '+fmt(a.nextActionGameAt):'Iniciativa: pendiente de inicializar'})()}</span></div>
               <button type="button" onClick={()=>patchCharacter({routine:buildDefaultRoutine({occupation:character.occupation,city:character.location})})}>✦ Regenerar rutina</button>
+            </div>
+            <div className="admin-card-head sub"><span>MEMORIA VIVA + INTENCIONES</span></div>
+            <div className="admin-grid">
+              <div className="admin-card">
+                <div className="admin-card-head"><span>RECUERDOS ACTIVOS</span></div>
+                <div className="admin-event-list">{lifeMemories.filter(x=>x.characterKey===('world:'+String(character.id))&&x.status==='active').slice(0,8).map(m=><div className="admin-event" key={'mem-'+m.id}><div><b>{m.type} · importancia {m.importance}</b><p>{m.summary}</p><small>{fmt(m.occurredGameAt)} · recordado {m.recallCount||0} veces</small></div></div>)}{!lifeMemories.some(x=>x.characterKey===('world:'+String(character.id))&&x.status==='active')&&<div className="admin-empty">Aún no hay recuerdos persistentes para este personaje.</div>}</div>
+              </div>
+              <div className="admin-card">
+                <div className="admin-card-head"><span>ASUNTOS PENDIENTES</span></div>
+                <div className="admin-event-list">{lifeIntentions.filter(x=>x.characterKey===('world:'+String(character.id))&&['pending','active'].includes(x.status)).slice(0,8).map(i=><div className="admin-event" key={'intent-'+i.id}><div><b>{i.type} · prioridad {i.priority}</b><p>{i.summary}</p><small>{i.status}{i.notBeforeGameAt?' · desde '+fmt(i.notBeforeGameAt):''}</small></div></div>)}{!lifeIntentions.some(x=>x.characterKey===('world:'+String(character.id))&&['pending','active'].includes(x.status))&&<div className="admin-empty">No hay intenciones pendientes.</div>}</div>
+              </div>
             </div>
             {[['appearance','Apariencia real / referencia visual'],['personality','Personalidad'],['communication','Forma de comunicarse'],['objectives','Objetivos'],['boundaries','Límites'],['secrets','Secretos'],['notes','Notas privadas del Director']].map(([k,l])=><label className="admin-textarea" key={k}>{l}<textarea value={character[k]||''} onChange={e=>patchCharacter({[k]:e.target.value})}/></label>)}
             <div className="admin-card-head sub"><span>PARÁMETROS</span></div><div className="admin-traits">{TRAITS.map(t=><label key={t}><span>{t}</span><input type="range" min="0" max="100" value={character.traits?.[t]??50} onChange={e=>patchTrait(t,e.target.value)}/><b>{character.traits?.[t]??50}</b></label>)}</div>
