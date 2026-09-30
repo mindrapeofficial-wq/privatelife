@@ -37,6 +37,11 @@ export async function GET(request) {
       [userId]
     );
 
+    const whatsappMessages = await query(
+      "SELECT id, contact_key, contact_name, direction, message_type, body, created_at, read_at FROM private_life.whatsapp_messages WHERE user_id = $1 ORDER BY created_at DESC LIMIT 160",
+      [userId]
+    );
+
     return NextResponse.json({
       player: {
         id: String(row.id),
@@ -54,6 +59,16 @@ export async function GET(request) {
             label: x.event_label,
             data: x.event_data || {},
             createdAt: x.created_at,
+          })),
+          whatsapp: whatsappMessages.rows.map(x => ({
+            id: String(x.id),
+            contactId: x.contact_key,
+            contactName: x.contact_name,
+            side: x.direction,
+            type: x.message_type,
+            text: x.body || '',
+            createdAt: x.created_at,
+            readAt: x.read_at,
           })),
         },
       },
