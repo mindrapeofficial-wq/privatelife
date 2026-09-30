@@ -319,7 +319,7 @@ function PhoneApp({src,name,onOpen,dock=false,cssIcon='',brand=false,editMode=fa
  </button>
 }
 function AppWindow({name,onClose,authUser,logout}){
- if(name==='Private Life')return <div className="app-window app-private-life native-window"><PrivateLifeApp onClose={onClose}/></div>;
+ if(name==='Private Life')return <div className="app-window app-private-life"><PrivateLifeApp onClose={onClose}/></div>;
  if(name==='WhatsApp')return <div className="app-window app-whatsapp native-window"><WhatsAppApp onClose={onClose}/></div>;
  if(name==='Contactos')return <div className="app-window app-contactos native-window"><ContactsApp onClose={onClose}/></div>;
  if(name==='Facebook')return <div className="app-window app-facebook native-window"><FacebookApp onClose={onClose}/></div>;
