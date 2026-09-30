@@ -128,7 +128,7 @@ export default function FacebookApp({onClose}){
 
   return <div className="facebook-app">
     <header className="fb-top">
-      <button className="fb-close" onClick={onClose} aria-label="Cerrar">‹</button>
+      <button className="fb-close pl-unified-back" onClick={onClose} aria-label="Volver">‹</button>
       <div className="fb-wordmark">facebook</div>
       <button className="fb-round" onClick={()=>{setTab('people');setSearch('')}} aria-label="Buscar">⌕</button>
     </header>
@@ -169,7 +169,7 @@ export default function FacebookApp({onClose}){
       {tab==='messages'&&(chat?
         <section className="fb-chat">
           <div className="fb-chat-head">
-            <button onClick={()=>setChat(null)}>‹</button><Avatar user={chat} size="sm"/><button className="fb-chat-person" onClick={()=>setProfile(chat)}><b>{chat.name}</b><span>@{chat.username}</span></button>
+            <button className="fb-chat-back pl-unified-back" aria-label="Volver a mensajes" onClick={()=>setChat(null)}>‹</button><Avatar user={chat} size="sm"/><button className="fb-chat-person" onClick={()=>setProfile(chat)}><b>{chat.name}</b><span>@{chat.username}</span></button>
             <button className="fb-chat-contact" onClick={()=>contact(chat)}>＋</button>
           </div>
           <div className="fb-chat-messages">
