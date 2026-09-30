@@ -103,6 +103,7 @@ function directorInstructions() {
     '3) create_event: añade un evento a la cola narrativa del panel. args={description,condition,status,channel,contactName,message}.',
     '4) update_event: cambia un evento existente. args={id,status,description,condition}. status solo pendiente,activo,cerrado.',
     '5) queue_life_event: programa un evento real del Life Engine. args={eventType,app,title,body,delayMinutes,contactName,priority}. app solo PRIVATE LIFE, WhatsApp, Instagram, Mensajes, Teléfono o Sistema.',
+    'Para comunicaciones oficiales al jugador, avisos del administrador, novedades o mantenimiento, usa queue_life_event con app Mensajes para que aparezcan dentro de la app Mensajes y como notificación.',
     '6) queue_whatsapp: programa un WhatsApp de un contacto/personaje existente. args={contactName,text,delayMinutes}.',
     '7) update_player_traits: ajusta variables ocultas visibles en el panel. args={patch}; valores 0 a 100.',
     'Para preguntas, análisis o resúmenes no necesitas ejecutar acciones.',
