@@ -6,6 +6,7 @@ import FacebookApp from './FacebookApp';
 import WhatsAppApp from './WhatsAppApp';
 import PhoneNotifications from './PhoneNotifications';
 import PrivateLifeApp from './PrivateLifeApp';
+import NowApp from './NowApp';
 import PhoneAppStore, { APP_STORE_CATALOG, buildAppNarrativeContext } from './PhoneAppStore';
 import { useLifeClock } from './LifeClock';
 
@@ -260,6 +261,7 @@ function PhoneHome({identity,datingApps,appStore,authUser,logout,onInstallApp,on
        <section className="home-page second-page">
          <div className="clock-widget"><span>PRIVATE LIFE</span><b>{identity.name||'Tu vida'}</b><small>Tu historia continúa aquí</small></div>
          <div className="apps ios-grid compact-grid">
+           <PhoneApp {...appProps} cssIcon="now" name="Ahora" onOpen={()=>setOpened('Ahora')}/>
            <PhoneApp {...appProps} src="/phone/notes.webp" name="Notas" onOpen={()=>setOpened('Notas')}/>
            <PhoneApp {...appProps} src="/phone/settings.webp" name="Ajustes" onOpen={()=>setOpened('Ajustes')}/>
            {installedSet.has('private-life')&&<PhoneApp {...appProps} removable appId="private-life" onRemove={removeApp} brand name="Private Life" onOpen={()=>setOpened('Private Life')}/>}
@@ -317,11 +319,12 @@ function PhoneApp({src,name,onOpen,dock=false,cssIcon='',brand=false,editMode=fa
    aria-label={name||'Aplicación'}
  >
    {editMode&&removable&&<span className="app-delete-badge" role="button" aria-label={'Desinstalar '+(name||'aplicación')} onPointerDown={e=>{e.stopPropagation();clearHold()}} onClick={e=>{e.preventDefault();e.stopPropagation();onRemove?.(appId)}}>−</span>}
-   {brand?<div className="ios-appicon brand-icon"><img src={PRIVATE_LIFE_LOGO} alt=""/></div>:cssIcon?<div className={'ios-appicon css-app '+cssIcon}>{cssIcon==='music'?'♪':cssIcon==='appstore'?<span className="appstore-glyph"><i/><i/><i/></span>:<span className="compass-needle"/>}</div>:<img className="ios-appicon" src={src} alt=""/>}
+   {brand?<div className="ios-appicon brand-icon"><img src={PRIVATE_LIFE_LOGO} alt=""/></div>:cssIcon?<div className={'ios-appicon css-app '+cssIcon}>{cssIcon==='music'?'♪':cssIcon==='appstore'?<span className="appstore-glyph"><i/><i/><i/></span>:cssIcon==='now'?<span className="now-glyph">⌖</span>:<span className="compass-needle"/>}</div>:<img className="ios-appicon" src={src} alt=""/>}
    {name&&<span className="ios-label">{name}</span>}
  </button>
 }
 function AppWindow({name,onClose,authUser,logout}){
+ if(name==='Ahora')return <div className="app-window app-now native-window"><NowApp onClose={onClose}/></div>;
  if(name==='Private Life')return <div className="app-window app-private-life"><PrivateLifeApp onClose={onClose}/></div>;
  if(name==='WhatsApp')return <div className="app-window app-whatsapp native-window"><WhatsAppApp onClose={onClose}/></div>;
  if(name==='Contactos')return <div className="app-window app-contactos native-window"><ContactsApp onClose={onClose}/></div>;
