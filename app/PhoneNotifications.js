@@ -57,7 +57,8 @@ export default function PhoneNotifications(){
         const contacts=JSON.parse(localStorage.getItem(CONTACTS)||'[]');
         const adults=(Array.isArray(contacts)?contacts:[]).filter(c=>c?.id&&c?.name&&Number(c?.age)>=18).slice(0,200).map(c=>({
           id:c.id,name:c.name,age:c.age,city:c.city,relationshipType:c.relationshipType,relation:c.relation,
-          affection:c.affection,profile:c.profile,engineContext:c.engineContext,masterSheet:c.masterSheet
+          affection:c.affection,profile:c.profile,engineContext:c.engineContext,masterSheet:c.masterSheet,
+          sourceType:c.sourceType,isAI:c.isAI===true,npcId:c.npcId||null,npcConfigSnapshot:c.npcConfigSnapshot||null
         }));
         if(!adults.length)return;
         const response=await fetch('/api/whatsapp',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'poll',contacts:adults})});
