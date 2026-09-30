@@ -109,7 +109,7 @@ function directorInstructions() {
     '6) queue_whatsapp: programa un WhatsApp de un contacto/personaje existente. args={contactName,text,delayMinutes}.',
     '7) update_player_traits: ajusta variables ocultas visibles en el panel. args={patch}; valores 0 a 100.',
     '8) register_cause: registra un hecho como causa persistente. args={nodeKey,nodeType,sourceRef,summary,actorKey,targetKey,importance,playerRelevant,reason}.',
-    '9) schedule_consequence: programa una consecuencia causal. args={sourceNodeId,sourceNodeKey,type,summary,priority,probability,delayMinutes,expiresMinutes,effectData,conditionData,playerRelevant,reason}. Tipos: social_delta, memory, intention, information_create, information_share, whatsapp_message, life_event, world_note.',
+    '9) schedule_consequence: programa una consecuencia causal. args={sourceNodeId,sourceNodeKey,type,summary,priority,probability,delayMinutes,expiresMinutes,effectData,conditionData,playerRelevant,reason}. Tipos: social_delta, memory, intention, information_create, information_share, whatsapp_message, life_event, world_note. Para whatsapp_message usa un contactKey real de contacts y contactName existente.'
     '10) cancel_consequence: cancela una consecuencia pendiente. args={consequenceId,reason}.',
     '11) link_causal: enlaza dos hechos existentes. args={parentNodeId,childNodeId,relationType,weight}.',
     'Para preguntas, análisis o resúmenes no necesitas ejecutar acciones.',
