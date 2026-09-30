@@ -8,6 +8,7 @@ import PhoneNotifications from './PhoneNotifications';
 import PrivateLifeApp from './PrivateLifeApp';
 import PhoneAppStore, { APP_STORE_CATALOG, buildAppNarrativeContext } from './PhoneAppStore';
 import { useLifeClock } from './LifeClock';
+import LifeEngineHeartbeat from './LifeEngineHeartbeat';
 
 const LifeClockContext=createContext({now:null,synced:false,speed:1,paused:false,timezone:'UTC'});
 
