@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import ContactsApp from './ContactsApp';
 import FacebookApp from './FacebookApp';
 import WhatsAppApp from './WhatsAppApp';
+import MessagesApp from './MessagesApp';
 import PhoneNotifications from './PhoneNotifications';
 import PrivateLifeApp from './PrivateLifeApp';
 import NowApp from './NowApp';
@@ -363,6 +364,7 @@ function AppWindow({name,onClose,authUser,logout}){
  if(name==='Ahora')return <div className="app-window app-now native-window"><NowApp onClose={onClose}/></div>;
  if(name==='Private Life')return <div className="app-window app-private-life"><PrivateLifeApp onClose={onClose}/></div>;
  if(name==='WhatsApp')return <div className="app-window app-whatsapp native-window"><WhatsAppApp onClose={onClose}/></div>;
+ if(name==='Mensajes')return <div className="app-window app-mensajes native-window"><MessagesApp onClose={onClose}/></div>;
  if(name==='Contactos')return <div className="app-window app-contactos native-window"><ContactsApp onClose={onClose}/></div>;
  if(name==='Facebook')return <div className="app-window app-facebook native-window"><FacebookApp onClose={onClose}/></div>;
  if(name==='Ajustes')return <div className="app-window app-ajustes native-settings-window"><Status/><SettingsApp onClose={onClose} authUser={authUser} logout={logout}/><button className="home-gesture-button" aria-label="Volver al inicio" onClick={onClose}><span/></button></div>;
