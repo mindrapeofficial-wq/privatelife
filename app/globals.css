@@ -1072,3 +1072,294 @@
 .admin-ai-disclaimer{color:#60697b;font-size:10px;line-height:1.5;padding:2px 5px 8px}
 @media(max-width:1000px){.admin-ai-mind-status{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-ai-mind-grid{grid-template-columns:1fr}}
 @media(max-width:620px){.admin-ai-mind-status{grid-template-columns:1fr}.admin-ai-run-list button{grid-template-columns:1fr}.admin-ai-action-list article{grid-template-columns:1fr}.admin-ai-action-list .kind{margin-bottom:2px}}
+
+
+/* === PRIVATE LIFE · Realistic phone notification system === */
+.ios-app[data-badge]::after{
+  content:attr(data-badge);
+  position:absolute;
+  z-index:12;
+  top:-8px;
+  left:calc(50% + 17px);
+  min-width:21px;
+  height:21px;
+  padding:0 6px;
+  border-radius:999px;
+  border:2px solid rgba(255,255,255,.98);
+  background:#ff3b30;
+  color:#fff;
+  display:grid;
+  place-items:center;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+  font-size:11px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:-.25px;
+  box-shadow:0 2px 7px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.2);
+  transform-origin:center;
+  animation:plBadgePop .36s cubic-bezier(.2,1.35,.35,1);
+  pointer-events:none;
+}
+.dock-app[data-badge]::after{top:-7px;left:calc(50% + 17px)}
+@keyframes plBadgePop{
+  0%{transform:scale(.2);opacity:0}
+  68%{transform:scale(1.16);opacity:1}
+  100%{transform:scale(1);opacity:1}
+}
+.ios-app.pl-notification-hit .ios-appicon{
+  animation:plAppNotify .7s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes plAppNotify{
+  0%,100%{transform:translateY(0) scale(1)}
+  22%{transform:translateY(-7px) scale(1.055)}
+  43%{transform:translateY(1px) scale(.985)}
+  62%{transform:translateY(-3px) scale(1.025)}
+  80%{transform:translateY(0) scale(1)}
+}
+
+.pl-notification-banner{
+  position:absolute;
+  z-index:190;
+  top:47px;
+  left:9px;
+  right:9px;
+  min-height:78px;
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr);
+  gap:10px;
+  align-items:start;
+  padding:10px 12px;
+  border:1px solid rgba(255,255,255,.46);
+  border-radius:22px;
+  color:#111217;
+  background:linear-gradient(180deg,rgba(250,250,252,.9),rgba(238,239,244,.82));
+  -webkit-backdrop-filter:blur(28px) saturate(1.75);
+  backdrop-filter:blur(28px) saturate(1.75);
+  box-shadow:0 10px 34px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.7);
+  overflow:hidden;
+  cursor:pointer;
+  touch-action:pan-x pan-y;
+  animation:plBannerIn .48s cubic-bezier(.18,.9,.21,1.08);
+  transform-origin:50% 0;
+}
+.pl-notification-banner::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(120deg,rgba(255,255,255,.28),transparent 42%);
+}
+@keyframes plBannerIn{
+  0%{opacity:0;transform:translateY(-120%) scale(.94)}
+  58%{opacity:1;transform:translateY(5px) scale(1.012)}
+  100%{opacity:1;transform:translateY(0) scale(1)}
+}
+
+.pl-notification-icon{
+  position:relative;
+  z-index:1;
+  width:42px;
+  height:42px;
+  border-radius:11px;
+  background:linear-gradient(145deg,#1c2029,#3a4354);
+  color:#fff;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  flex:none;
+  font-size:16px;
+  font-weight:850;
+  letter-spacing:-.45px;
+  box-shadow:0 2px 8px rgba(0,0,0,.18),inset 0 0 0 1px rgba(255,255,255,.15);
+}
+.pl-notification-icon img{width:100%;height:100%;display:block;object-fit:cover}
+.pl-notification-copy{position:relative;z-index:1;min-width:0;padding:1px 0 0}
+.pl-notification-copy>div{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.pl-notification-copy>div b{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  text-transform:uppercase;
+  font-size:10px;
+  line-height:1.15;
+  letter-spacing:.04em;
+  color:#4d5058;
+}
+.pl-notification-copy>div span{flex:none;color:#7d8088;font-size:9px}
+.pl-notification-copy strong{
+  display:block;
+  margin-top:3px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:13px;
+  line-height:1.2;
+  letter-spacing:-.08px;
+}
+.pl-notification-copy p{
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  overflow:hidden;
+  margin:2px 0 0;
+  color:#363941;
+  font-size:11.5px;
+  line-height:1.28;
+}
+
+.pl-notification-shade{
+  position:absolute;
+  z-index:185;
+  inset:0;
+  color:#111217;
+  overflow:hidden;
+  touch-action:pan-y;
+  animation:plShadeIn .34s cubic-bezier(.2,.82,.2,1);
+}
+@keyframes plShadeIn{
+  from{opacity:.25;transform:translateY(-32px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.pl-notification-shade-bg{
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(circle at 75% 8%,rgba(118,133,170,.45),transparent 29%),
+    linear-gradient(180deg,rgba(39,45,59,.52),rgba(9,11,16,.73));
+  -webkit-backdrop-filter:blur(26px) saturate(1.3);
+  backdrop-filter:blur(26px) saturate(1.3);
+}
+.pl-notification-shade-content{
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  padding:11px 10px 23px;
+}
+.pl-notification-grabber{
+  width:42px;
+  height:5px;
+  border-radius:999px;
+  margin:0 auto 18px;
+  background:rgba(255,255,255,.72);
+  box-shadow:0 1px 3px rgba(0,0,0,.18);
+}
+.pl-notification-clock{
+  color:#fff;
+  text-align:center;
+  text-shadow:0 2px 12px rgba(0,0,0,.36);
+  padding:5px 8px 16px;
+}
+.pl-notification-clock b{
+  display:block;
+  font-size:62px;
+  line-height:.98;
+  font-weight:250;
+  letter-spacing:-3.6px;
+}
+.pl-notification-clock span{
+  display:block;
+  margin-top:6px;
+  font-size:12px;
+  font-weight:620;
+  text-transform:capitalize;
+}
+.pl-notification-tools{
+  min-height:33px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:0 5px 8px;
+  color:rgba(255,255,255,.82);
+  font-size:10px;
+}
+.pl-notification-tools>div{display:flex;gap:6px}
+.pl-notification-tools button{
+  border:0;
+  border-radius:999px;
+  padding:6px 9px;
+  background:rgba(255,255,255,.16);
+  color:#fff;
+  -webkit-backdrop-filter:blur(14px);
+  backdrop-filter:blur(14px);
+  font-size:9px;
+  font-weight:700;
+}
+.pl-notification-list{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:0 1px 22px;
+  scrollbar-width:none;
+}
+.pl-notification-list::-webkit-scrollbar{display:none}
+.pl-notification-card{
+  position:relative;
+  min-height:76px;
+  display:grid;
+  grid-template-columns:43px minmax(0,1fr) 12px;
+  gap:10px;
+  align-items:start;
+  padding:10px 10px;
+  border:1px solid rgba(255,255,255,.4);
+  border-radius:21px;
+  background:linear-gradient(180deg,rgba(251,251,253,.9),rgba(235,237,243,.82));
+  -webkit-backdrop-filter:blur(24px) saturate(1.65);
+  backdrop-filter:blur(24px) saturate(1.65);
+  box-shadow:0 7px 24px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.65);
+  transition:transform .2s cubic-bezier(.2,.8,.2,1),opacity .2s ease,filter .2s ease;
+  touch-action:pan-y;
+  user-select:none;
+}
+.pl-notification-card.unread{box-shadow:0 8px 28px rgba(0,0,0,.22),inset 3px 0 #0a84ff,inset 0 1px rgba(255,255,255,.72)}
+.pl-notification-card.read{filter:saturate(.82);opacity:.87}
+.pl-notification-card:active{transform:scale(.985)}
+.pl-notification-swipe-hint{
+  align-self:center;
+  color:#8b8e96;
+  font-size:19px;
+  line-height:1;
+  opacity:.62;
+}
+.pl-notification-empty{
+  min-height:120px;
+  margin-top:18px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  color:rgba(255,255,255,.72);
+  text-align:center;
+  text-shadow:0 2px 10px rgba(0,0,0,.28);
+}
+.pl-notification-empty b{font-size:14px}
+.pl-notification-empty span{margin-top:4px;font-size:10px;color:rgba(255,255,255,.48)}
+.pl-notification-homebar{
+  position:absolute;
+  left:50%;
+  bottom:7px;
+  transform:translateX(-50%);
+  width:124px;
+  height:5px;
+  border-radius:999px;
+  background:rgba(255,255,255,.9);
+  box-shadow:0 1px 3px rgba(0,0,0,.26);
+}
+
+@media(max-width:380px){
+  .pl-notification-banner{left:7px;right:7px;top:44px;border-radius:20px}
+  .pl-notification-clock b{font-size:54px}
+  .pl-notification-card{grid-template-columns:40px minmax(0,1fr) 9px}
+  .pl-notification-icon{width:40px;height:40px}
+  .ios-app[data-badge]::after{left:calc(50% + 14px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .pl-notification-banner,.pl-notification-shade,.ios-app[data-badge]::after,.ios-app.pl-notification-hit .ios-appicon{animation:none!important}
+  .pl-notification-card{transition:none}
+}
