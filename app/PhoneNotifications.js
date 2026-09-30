@@ -9,6 +9,7 @@ const PHONE_SETTINGS='private-life-phone-settings-v1';
 const CONTACTS='private-life-contacts';
 const STORY='private-life-narrative-events-v1';
 const MESSAGE_INBOX='private-life-messages-v1';
+const FORCE_LUISA_TEST='private-life-force-luisa-test-v1';
 const MAX_NOTIFICATIONS=60;
 
 const appGlyphs={
@@ -112,6 +113,60 @@ export default function PhoneNotifications(){
   },[]);
 
   useEffect(()=>{const timer=setInterval(()=>setClock(new Date()),30000);return()=>clearInterval(timer)},[]);
+
+  useEffect(()=>{
+    let cancelled=false;
+    async function forceLuisaOnce(){
+      try{
+        if(localStorage.getItem(FORCE_LUISA_TEST))return;
+        const raw=JSON.parse(localStorage.getItem(CONTACTS)||'[]');
+        const contacts=Array.isArray(raw)?raw:[];
+        const luisa=contacts.find(c=>{
+          const name=normalize(c?.name||'');
+          const source=normalize(c?.sourceType||c?.kind||'');
+          const npc=Boolean(c?.npcId)||c?.isAI===true||source.includes('personaje')||source.includes('npc')||source==='ia';
+          return npc&&(name==='luisa'||name.startsWith('luisa '));
+        });
+        if(!luisa||Number(luisa.age)<18)return;
+        const contact={
+          id:luisa.id,name:luisa.name,age:luisa.age,city:luisa.city,
+          relationshipType:luisa.relationshipType,relation:luisa.relation,affection:luisa.affection,
+          profile:luisa.profile,engineContext:luisa.engineContext,masterSheet:luisa.masterSheet,
+          sourceType:luisa.sourceType,isAI:luisa.isAI===true,npcId:luisa.npcId||null,
+          npcConfigSnapshot:luisa.npcConfigSnapshot||null
+        };
+        const response=await fetch('/api/whatsapp',{
+          method:'POST',credentials:'same-origin',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({action:'force',contact})
+        });
+        if(!response.ok)return;
+        const data=await response.json();
+        if(cancelled||!data?.message)return;
+        localStorage.setItem(FORCE_LUISA_TEST,new Date().toISOString());
+        window.dispatchEvent(new CustomEvent('private-life:notify',{detail:{
+          id:'wa-force-'+data.message.id,
+          app:'WhatsApp',
+          title:data.message.contactName||luisa.name||'WhatsApp',
+          body:data.message.text||'Nuevo mensaje',
+          createdAt:data.message.createdAt||new Date().toISOString(),
+          priority:'high',
+          data:{contactId:data.message.contactId,messageId:data.message.id,forcedTest:true}
+        }}));
+        window.dispatchEvent(new CustomEvent('private-life:narrative-event',{detail:{
+          id:'forced-test-'+data.message.id,
+          createdAt:data.message.createdAt||new Date().toISOString(),
+          source:'life-engine',
+          type:'npc_forced_test',
+          contactId:data.message.contactId,
+          contactName:data.message.contactName,
+          text:data.message.text||''
+        }}));
+      }catch{}
+    }
+    const timer=setTimeout(forceLuisaOnce,1800);
+    return()=>{cancelled=true;clearTimeout(timer)};
+  },[]);
 
 
   useEffect(()=>{
