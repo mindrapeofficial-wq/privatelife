@@ -63,7 +63,7 @@ export default function AdminPage(){
   const character=useMemo(()=>chars.find(x=>x.id===charId)||chars[0]||null,[chars,charId]);
   const phone=player?.phone||{state:{},activity:[],updatedAt:null},phoneState=phone.state||{},phoneActivity=Array.isArray(phone.activity)?phone.activity:[];
   const phoneFresh=phone.updatedAt&&Date.now()-new Date(phone.updatedAt).getTime()<12000&&phoneState.visibility!=='offline';
-  const installedPhoneApps=['Instagram',...(save.datingApps?.tinder?['Tinder']:[]),...(save.datingApps?.grindr?['Grindr']:[]),'Contactos','Fotos','Calendario','Notas','Ajustes','Teléfono','Mensajes','Safari','Música'];
+  const installedPhoneApps=['Instagram','WhatsApp','Facebook',...(save.datingApps?.tinder?['Tinder']:[]),...(save.datingApps?.grindr?['Grindr']:[]),'Contactos','Fotos','Calendario','App Store','Notas','Ajustes','Teléfono','Mensajes','Safari','Música'];
 
   function localEdit(fn){
     if(!player)return;
