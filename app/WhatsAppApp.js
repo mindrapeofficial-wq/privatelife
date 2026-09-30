@@ -14,10 +14,11 @@ function contactsFromStorage(){const list=readJson(CONTACTS_KEY,[]);return Array
 function Avatar({contact,size='md'}){const photo=contact?.photos?.[0];return photo?<img className={'wa-avatar '+size} src={photo} alt=""/>:<span className={'wa-avatar wa-avatar-fallback '+size}>{String(contact?.name||'?').trim().charAt(0).toUpperCase()}</span>}
 function groupMessages(contacts,messages,previous={}){
  const out={};
- contacts.forEach(c=>{out[c.id]={messages:[],unread:previous[c.id]?.unread||0}});
+ contacts.forEach(c=>{out[c.id]={messages:[],unread:0}});
  messages.forEach(m=>{
    if(!out[m.contactId])out[m.contactId]={messages:[],unread:0};
    out[m.contactId].messages.push(m);
+   if(m.side==='in'&&!m.readAt)out[m.contactId].unread+=1;
  });
  return out;
 }
@@ -113,6 +114,7 @@ export default function WhatsAppApp({onClose}){
      const data=await api('/api/whatsapp',{method:'POST',body:JSON.stringify({action:'send',contact:contactPayload(active),type,text,image})});
      storyEvent(active,type==='image'?'photo_sent':'message_sent',text?{text}:{});
      if(data.reply?.text)storyEvent(active,'message_received',{text:data.reply.text});
+     await api('/api/whatsapp',{method:'POST',body:JSON.stringify({action:'read',contact:contactPayload(active)})}).catch(()=>{});
      await refreshMessages();
    }catch{
      setOnline(false);
