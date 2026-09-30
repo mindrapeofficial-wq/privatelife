@@ -148,7 +148,7 @@ export default function AdminPage(){
   const chars=save.world.characters,events=save.world.events;
   const character=useMemo(()=>chars.find(x=>x.id===charId)||chars[0]||null,[chars,charId]);
   const phone=player?.phone||{state:{},activity:[],whatsapp:[],updatedAt:null},phoneState=phone.state||{},phoneActivity=Array.isArray(phone.activity)?phone.activity:[],phoneWhatsapp=Array.isArray(phone.whatsapp)?phone.whatsapp:[];
-  const life=player?.life||{characters:[],events:[],context:null,worldLocation:null,timezone:'UTC',speed:1,paused:false},lifeCharacters=Array.isArray(life.characters)?life.characters:[],lifeEvents=Array.isArray(life.events)?life.events:[],playerContext=life.context||null,worldLocation=life.worldLocation||null;
+  const life=player?.life||{characters:[],events:[],autonomy:[],autonomyEvents:[],context:null,worldLocation:null,timezone:'UTC',speed:1,paused:false},lifeCharacters=Array.isArray(life.characters)?life.characters:[],lifeEvents=Array.isArray(life.events)?life.events:[],lifeAutonomy=Array.isArray(life.autonomy)?life.autonomy:[],lifeAutonomyEvents=Array.isArray(life.autonomyEvents)?life.autonomyEvents:[],playerContext=life.context||null,worldLocation=life.worldLocation||null;
   const phoneFresh=phone.updatedAt&&Date.now()-new Date(phone.updatedAt).getTime()<12000&&phoneState.visibility!=='offline';
   const installedPhoneApps=['Instagram','WhatsApp','Facebook',...(save.datingApps?.tinder?['Tinder']:[]),...(save.datingApps?.grindr?['Grindr']:[]),'Contactos','Fotos','Calendario','App Store','Ahora','Notas','Ajustes','Teléfono','Mensajes','Safari','Música'];
 
