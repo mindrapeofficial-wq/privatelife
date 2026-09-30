@@ -205,6 +205,38 @@ export default function AdminPage(){
     return next;
   }
   function patchCharacter(patch){if(!character)return;localEdit(next=>{next.world.characters=next.world.characters.map(c=>c.id===character.id?{...c,...patch}:c)})}
+  function isCharacterIncomplete(c){
+    if(!c)return false;
+    return !String(c.role||'').trim()
+      || !String(c.occupation||'').trim()
+      || !String(c.location||'').trim()
+      || !String(c.appearance||'').trim()
+      || !String(c.personality||'').trim()
+      || !String(c.communication||'').trim()
+      || !String(c.objectives||'').trim()
+      || !String(c.boundaries||'').trim()
+      || !String(c.secrets||'').trim();
+  }
+  async function completeCharacterProcedurally(){
+    if(!character||!player)return;
+    const generated=proceduralCharacter(character.name||'');
+    const completed={
+      ...generated,
+      id:character.id,
+      name:character.name||generated.name,
+      createdAt:character.createdAt||generated.createdAt,
+      status:character.status||generated.status,
+      notes:[
+        generated.notes,
+        character.notes&&String(character.notes).trim()?'Notas anteriores: '+String(character.notes).trim():''
+      ].filter(Boolean).join('\n\n')
+    };
+    const next=structuredClone(save);
+    next.world.characters=next.world.characters.map(x=>x.id===character.id?completed:x);
+    setPlayer(cur=>({...cur,save:next}));
+    setCharId(completed.id);
+    await persist(next,'Ficha procedural completada: '+completed.name);
+  }
   function patchTrait(trait,value){if(!character)return;localEdit(next=>{next.world.characters=next.world.characters.map(c=>c.id===character.id?{...c,traits:{...(c.traits||{}),[trait]:Number(value)}}:c)})}
   async function addEvent(text=eventDraft){
     text=String(text||'').trim();if(!text||!player)return;
@@ -284,7 +316,7 @@ export default function AdminPage(){
             {!chars.length&&<div className="admin-empty">No hay NPC todavía. Pulsa “Generar” para crear una ficha procedural completa o pídeselo a Director IA.</div>}
           </section>
           <section className="admin-card admin-character-sheet">{!character?<div className="admin-empty large">Selecciona o crea un personaje.</div>:<>
-            <div className="admin-card-head"><span>FICHA MAESTRA</span><button disabled={busy} onClick={()=>persist(save,'Ficha de '+character.name+' modificada')}>Guardar ficha</button></div>
+            <div className="admin-card-head"><span>FICHA MAESTRA</span><div className="admin-sheet-actions">{isCharacterIncomplete(character)&&<button className="admin-procedural-fill" disabled={busy} onClick={completeCharacterProcedurally}>✦ Completar proceduralmente</button>}<button disabled={busy} onClick={()=>persist(save,'Ficha de '+character.name+' modificada')}>Guardar ficha</button></div></div>{isCharacterIncomplete(character)&&<div className="admin-incomplete-banner"><b>Ficha incompleta</b><span>Este personaje fue creado con el sistema anterior o tiene campos esenciales vacíos. Puedes completarlo automáticamente conservando su nombre.</span></div>}
             <div className="admin-form-grid">
               <label>Nombre<input value={character.name||''} onChange={e=>patchCharacter({name:e.target.value})}/></label>
               <label>Edad<input type="number" min="18" value={character.age||18} onChange={e=>patchCharacter({age:Math.max(18,Number(e.target.value)||18)})}/></label>
