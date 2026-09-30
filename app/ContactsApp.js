@@ -32,7 +32,7 @@ function Avatar({contact,size='normal'}){const photo=contact?.photos?.[0];return
 export default function ContactsApp({onClose}){
  const [contacts,setContacts]=useState([]),[mode,setMode]=useState('list'),[selected,setSelected]=useState(null),[editing,setEditing]=useState(null),[draft,setDraft]=useState(blank),[query,setQuery]=useState(''),[testIndex,setTestIndex]=useState(0);
  useEffect(()=>{try{const stored=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');setContacts(Array.isArray(stored)?stored.map(normalized):[])}catch{}},[]);
- function persist(next){setContacts(next);try{localStorage.setItem(STORAGE_KEY,JSON.stringify(next))}catch{}}
+ function persist(next){setContacts(next);try{localStorage.setItem(STORAGE_KEY,JSON.stringify(next));window.dispatchEvent(new CustomEvent('private-life:contacts-changed',{detail:{count:next.length}}))}catch{}}
  function newContact(){setEditing(null);setDraft({...blank,id:crypto.randomUUID?.()||String(Date.now())});setTestIndex(0);setMode('edit')}
  function editContact(c){setEditing(c.id);setDraft(normalized(c));setTestIndex(0);setMode('edit')}
  function regenerateMaster(){if(!draft.conversation.trim())return;const master=localMaster(draft);setDraft(d=>({...d,masterSheet:master,engineContext:engineContext(d,master)}))}
