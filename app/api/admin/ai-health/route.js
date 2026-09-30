@@ -62,7 +62,7 @@ export async function GET(request) {
       },
       body: JSON.stringify({
         model: selected.model,
-        store: false,
+        ...(selected.provider === 'openai' ? { store: false } : {}),
         input: 'Return only the word OK.',
         max_output_tokens: 32
       }),
