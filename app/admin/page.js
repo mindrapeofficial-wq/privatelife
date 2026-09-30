@@ -591,6 +591,17 @@ export default function AdminPage(){
                 <div className="admin-event-list">{lifeIntentions.filter(x=>x.characterKey===('world:'+String(character.id))&&['pending','active'].includes(x.status)).slice(0,8).map(i=><div className="admin-event" key={'intent-'+i.id}><div><b>{i.type} · prioridad {i.priority}</b><p>{i.summary}</p><small>{i.status}{i.notBeforeGameAt?' · desde '+fmt(i.notBeforeGameAt):''}</small></div></div>)}{!lifeIntentions.some(x=>x.characterKey===('world:'+String(character.id))&&['pending','active'].includes(x.status))&&<div className="admin-empty">No hay intenciones pendientes.</div>}</div>
               </div>
             </div>
+            <div className="admin-card-head sub"><span>RED SOCIAL NPC</span></div>
+            <div className="admin-grid">
+              <div className="admin-card">
+                <div className="admin-card-head"><span>VÍNCULOS</span></div>
+                <div className="admin-event-list">{socialEdges.filter(e=>[e.aKey,e.bKey].includes('world:'+String(character.id))).slice(0,10).map(e=>{const me='world:'+String(character.id),other=e.aKey===me?e.bKey:e.aKey,otherName=chars.find(c=>'world:'+String(c.id)===other)?.name||other;return <div className="admin-event" key={'edge-'+e.aKey+'-'+e.bKey}><div><b>{otherName} · {e.relationLabel}</b><p>afinidad {e.affinity} · confianza {e.trust} · tensión {e.tension} · familiaridad {e.familiarity}</p><small>{e.interactionCount||0} interacciones · {fmt(e.lastInteractionGameAt)}</small></div></div>})}{!socialEdges.some(e=>[e.aKey,e.bKey].includes('world:'+String(character.id)))&&<div className="admin-empty">Todavía no tiene vínculos NPC↔NPC registrados.</div>}</div>
+              </div>
+              <div className="admin-card">
+                <div className="admin-card-head"><span>ACTIVIDAD SOCIAL RECIENTE</span></div>
+                <div className="admin-event-list">{socialEvents.filter(e=>[e.actorKey,e.targetKey].includes('world:'+String(character.id))).slice(0,8).map(e=><div className="admin-event" key={'social-event-'+e.id}><div><b>{String(e.type||'interacción').replaceAll('_',' ')}</b><p>{e.summary}</p><small>{fmt(e.gameAt)} · {e.visibility}</small></div></div>)}{!socialEvents.some(e=>[e.actorKey,e.targetKey].includes('world:'+String(character.id)))&&<div className="admin-empty">Sin actividad social reciente.</div>}</div>
+              </div>
+            </div>
             {[['appearance','Apariencia real / referencia visual'],['personality','Personalidad'],['communication','Forma de comunicarse'],['objectives','Objetivos'],['boundaries','Límites'],['secrets','Secretos'],['notes','Notas privadas del Director']].map(([k,l])=><label className="admin-textarea" key={k}>{l}<textarea value={character[k]||''} onChange={e=>patchCharacter({[k]:e.target.value})}/></label>)}
             <div className="admin-card-head sub"><span>PARÁMETROS</span></div><div className="admin-traits">{TRAITS.map(t=><label key={t}><span>{t}</span><input type="range" min="0" max="100" value={character.traits?.[t]??50} onChange={e=>patchTrait(t,e.target.value)}/><b>{character.traits?.[t]??50}</b></label>)}</div>
           </>}</section>
