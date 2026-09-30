@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import LocationSetup from './LocationSetup';
 
 const LOCATIONS=[
   ['home','Casa','⌂'],['gym','Gimnasio','G'],['work','Trabajo','W'],['study','Estudios','E'],
@@ -31,6 +32,8 @@ function timezone(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone|
 
 export default function NowApp({onClose}){
   const [context,setContext]=useState(null);
+  const [worldLocation,setWorldLocation]=useState(null);
+  const [editingWorldLocation,setEditingWorldLocation]=useState(false);
   const [locationKey,setLocationKey]=useState('home');
   const [locationLabel,setLocationLabel]=useState('');
   const [activityKey,setActivityKey]=useState('free');
@@ -44,10 +47,15 @@ export default function NowApp({onClose}){
   async function load(){
     try{
       setError('');
-      const r=await fetch('/api/life/context?timezone='+encodeURIComponent(timezone()),{cache:'no-store'});
+      const [r,lr]=await Promise.all([
+        fetch('/api/life/context?timezone='+encodeURIComponent(timezone()),{cache:'no-store'}),
+        fetch('/api/life/location',{cache:'no-store'})
+      ]);
       const data=await r.json();
+      const locationData=await lr.json().catch(()=>({}));
       if(!r.ok)throw new Error(data.error||'No se pudo cargar.');
       const c=data.context||{};
+      setWorldLocation(locationData.location||null);
       setContext(c);setLocationKey(c.locationKey||'home');setLocationLabel(c.locationLabel||'');
       setActivityKey(c.activityKey||'free');setActivityLabel(c.activityLabel||'');
     }catch(e){setError(e.message||'No se pudo cargar.')}finally{setLoading(false)}
@@ -75,6 +83,8 @@ export default function NowApp({onClose}){
     }catch(e){setError(e.message||'No se pudo actualizar.')}finally{setSaving(false)}
   }
 
+  if(editingWorldLocation)return <LocationSetup initialCity={worldLocation?.displayLabel||''} onCancel={()=>setEditingWorldLocation(false)} onComplete={loc=>{setWorldLocation(loc);setEditingWorldLocation(false)}}/>;
+
   return <div className="now-app">
     <header className="now-head"><button onClick={onClose} aria-label="Volver">‹</button><div><b>Ahora</b><span>Tu contexto cambia el mundo</span></div><i/></header>
     <main className="now-scroll">
@@ -83,8 +93,10 @@ export default function NowApp({onClose}){
         <b>{context?.locationLabel||'Casa'}</b>
         <strong>{context?.activityLabel||'Disponible'}</strong>
         <small>{context?.availability==='busy'?'Ocupado':context?.availability==='offline'?'No disponible':context?.availability==='limited'?'Disponibilidad limitada':'Disponible'}</small>
+        {worldLocation?.displayLabel&&<em>{worldLocation.displayLabel}</em>}
       </section>
       {loading?<div className="now-loading">Sincronizando tu vida…</div>:<>
+        <section className="now-section now-world-location"><h3>Zona geográfica</h3><button onClick={()=>setEditingWorldLocation(true)}><div><b>{worldLocation?.displayLabel||'Sin configurar'}</b><span>{worldLocation?.region||worldLocation?.country||'Sitúa aquí el mundo de tu partida'}</span></div><i>›</i></button></section>
         <section className="now-section"><h3>¿Dónde estás?</h3><div className="now-location-grid">{LOCATIONS.map(([key,label,glyph])=><button key={key} className={locationKey===key?'selected':''} onClick={()=>chooseLocation(key)}><i>{glyph}</i><span>{label}</span></button>)}</div>{locationKey==='other'&&<input className="now-input" value={locationLabel} onChange={e=>setLocationLabel(e.target.value)} placeholder="Escribe el lugar"/>}</section>
         <section className="now-section"><h3>¿Qué estás haciendo?</h3><div className="now-activity-list">{activities.map(([key,label])=><button key={key} className={activityKey===key?'selected':''} onClick={()=>chooseActivity(key,label)}><span>{label}</span><i>{activityKey===key?'✓':''}</i></button>)}</div>{activityKey==='custom'&&<input className="now-input" value={activityLabel} onChange={e=>setActivityLabel(e.target.value)} placeholder="Describe tu actividad"/>}</section>
         <section className="now-section"><h3>¿Durante cuánto tiempo?</h3><div className="now-duration">{DURATIONS.map(([minutes,label])=><button key={minutes} className={durationMinutes===minutes?'selected':''} onClick={()=>setDurationMinutes(minutes)}>{label}</button>)}</div></section>
