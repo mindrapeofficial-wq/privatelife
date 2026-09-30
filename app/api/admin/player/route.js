@@ -23,6 +23,20 @@ export async function GET(request) {
     );
     const row = result.rows[0];
     if (!row) return NextResponse.json({ error: 'Jugador no encontrado.' }, { status: 404 });
+
+    const phoneState = await query(
+      'SELECT state_data, updated_at FROM private_life.phone_state WHERE user_id = $1 LIMIT 1',
+      [userId]
+    );
+    const phoneActivity = await query(
+      `SELECT id, event_type, event_label, event_data, created_at
+         FROM private_life.phone_activity
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 120`,
+      [userId]
+    );
+
     return NextResponse.json({
       player: {
         id: String(row.id),
@@ -31,6 +45,17 @@ export async function GET(request) {
         lastLoginAt: row.last_login_at,
         updatedAt: row.updated_at,
         save: row.save_data || {},
+        phone: {
+          state: phoneState.rows[0]?.state_data || {},
+          updatedAt: phoneState.rows[0]?.updated_at || null,
+          activity: phoneActivity.rows.map(x => ({
+            id: String(x.id),
+            type: x.event_type,
+            label: x.event_label,
+            data: x.event_data || {},
+            createdAt: x.created_at,
+          })),
+        },
       },
     });
   } catch (error) {
