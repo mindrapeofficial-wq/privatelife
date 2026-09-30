@@ -205,12 +205,12 @@ function PhoneHome({identity,datingApps,appStore,authUser,logout,onInstallApp}){
          <PhoneApp src="/phone/instagram.webp" name="Instagram" onOpen={()=>setOpened('Instagram')}/>
          <PhoneApp src={WHATSAPP_ICON} name="WhatsApp" onOpen={()=>setOpened('WhatsApp')}/>
          <PhoneApp src={FACEBOOK_ICON} name="Facebook" onOpen={()=>setOpened('Facebook')}/>
+         <PhoneApp cssIcon="appstore" name="App Store" onOpen={()=>setOpened('App Store')}/>
          {datingApps.tinder&&<PhoneApp src="/phone/tinder.webp" name="Tinder" onOpen={()=>setOpened('Tinder')}/>}
          {datingApps.grindr&&<PhoneApp src="/phone/grindr.webp" name="Grindr" onOpen={()=>setOpened('Grindr')}/>}
          <PhoneApp src="/phone/contacts.webp" name="Contactos" onOpen={()=>setOpened('Contactos')}/>
          <PhoneApp src="/phone/photos.webp" name="Fotos" onOpen={()=>{if(typeof window!=='undefined'&&typeof window.__plOpenGallery==='function')window.__plOpenGallery();else setOpened('Fotos')}}/>
          <PhoneApp src="/phone/calendar.webp" name="Calendario" onOpen={()=>setOpened('Calendario')}/>
-         <PhoneApp cssIcon="appstore" name="App Store" onOpen={()=>setOpened('App Store')}/>
        </div></section>
        <section className="home-page second-page">
          <div className="clock-widget"><span>PRIVATE LIFE</span><b>{identity.name||'Tu vida'}</b><small>Tu historia continúa aquí</small></div>
