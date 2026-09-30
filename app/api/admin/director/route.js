@@ -4,6 +4,8 @@ import { ensureSchema, query } from '../../../../lib/db.js';
 import { runCentralModel } from '../../../../lib/central-ai-provider.js';
 import { buildDefaultRoutine } from '../../../../lib/life-routines.js';
 import { WORLD_DIRECTOR_RULES } from '../../../../lib/world-director.js';
+import { loadSocialAnalysis } from '../../../../lib/life-social.js';
+import { loadCausalAnalysis, applyDirectorCausalPlan } from '../../../../lib/life-causality.js';
 
 export const runtime = 'nodejs';
 
@@ -106,6 +108,10 @@ function directorInstructions() {
     'Para comunicaciones oficiales al jugador, avisos del administrador, novedades o mantenimiento, usa queue_life_event con app Mensajes para que aparezcan dentro de la app Mensajes y como notificación.',
     '6) queue_whatsapp: programa un WhatsApp de un contacto/personaje existente. args={contactName,text,delayMinutes}.',
     '7) update_player_traits: ajusta variables ocultas visibles en el panel. args={patch}; valores 0 a 100.',
+    '8) register_cause: registra un hecho como causa persistente. args={nodeKey,nodeType,sourceRef,summary,actorKey,targetKey,importance,playerRelevant,reason}.',
+    '9) schedule_consequence: programa una consecuencia causal. args={sourceNodeId,sourceNodeKey,type,summary,priority,probability,delayMinutes,expiresMinutes,effectData,conditionData,playerRelevant,reason}. Tipos: social_delta, memory, intention, information_create, information_share, whatsapp_message, life_event, world_note. Para whatsapp_message usa un contactKey real de contacts y contactName existente.',
+    '10) cancel_consequence: cancela una consecuencia pendiente. args={consequenceId,reason}.',
+    '11) link_causal: enlaza dos hechos existentes. args={parentNodeId,childNodeId,relationType,weight}.',
     'Para preguntas, análisis o resúmenes no necesitas ejecutar acciones.',
     'Cuando el administrador pida análisis, estrategia, explicación o diagnóstico, responde con profundidad proporcional a la petición. No te limites a una frase corta.',
     'Cruza explícitamente los datos relevantes de jugador, contexto vivo, ubicación, teléfono, WhatsApp, personajes, relaciones, eventos, rutinas, historial y reloj cuando sean pertinentes.',
@@ -130,7 +136,11 @@ async function loadDirectorContext(userId) {
     clockResult,
     playerContextResult,
     locationResult,
-    lifeEventsResult
+    lifeEventsResult,
+    memoriesResult,
+    intentionsResult,
+    socialGraph,
+    causalGraph
   ] = await Promise.all([
     query(`SELECT u.id,u.username,u.created_at,u.last_login_at,gs.updated_at,gs.save_data
       FROM private_life.users u
@@ -152,7 +162,15 @@ async function loadDirectorContext(userId) {
     query('SELECT source,display_label,area,city,region,country,country_code,timezone,updated_at FROM private_life.player_location WHERE user_id=$1 LIMIT 1', [userId]),
     query(`SELECT id,event_key,event_type,app,title,body,payload,scheduled_game_at,status,created_at,delivered_at
       FROM private_life.life_events WHERE user_id=$1
-      ORDER BY created_at DESC LIMIT 60`, [userId])
+      ORDER BY created_at DESC LIMIT 60`, [userId]),
+    query(`SELECT id,character_key,memory_type,summary,importance,emotional_valence,occurred_game_at,last_recalled_game_at,recall_count,status
+      FROM private_life.npc_memories WHERE user_id=$1 AND status='active'
+      ORDER BY importance DESC,occurred_game_at DESC LIMIT 120`,[userId]),
+    query(`SELECT id,character_key,intention_type,summary,priority,status,not_before_game_at,due_game_at,trigger_data,created_game_at
+      FROM private_life.npc_intentions WHERE user_id=$1 AND status IN ('pending','active')
+      ORDER BY priority DESC,COALESCE(due_game_at,not_before_game_at,created_game_at) ASC LIMIT 100`,[userId]),
+    loadSocialAnalysis(userId,{limitEvents:80}),
+    loadCausalAnalysis(userId,{nodeLimit:160,consequenceLimit:140})
   ]);
 
   const row = playerResult.rows[0];
@@ -212,6 +230,19 @@ async function loadDirectorContext(userId) {
         }))
       },
       contacts: arr(save.social?.contacts).slice(0, 40).map(compactContact),
+      npcMind:{
+        memories:memoriesResult.rows.map(x=>({
+          id:String(x.id),characterKey:x.character_key,type:x.memory_type,summary:x.summary,
+          importance:Number(x.importance)||0,emotionalValence:Number(x.emotional_valence)||0,
+          occurredGameAt:x.occurred_game_at,lastRecalledGameAt:x.last_recalled_game_at,recallCount:Number(x.recall_count)||0
+        })),
+        intentions:intentionsResult.rows.map(x=>({
+          id:String(x.id),characterKey:x.character_key,type:x.intention_type,summary:x.summary,priority:Number(x.priority)||0,
+          status:x.status,notBeforeGameAt:x.not_before_game_at,dueGameAt:x.due_game_at,triggerData:x.trigger_data||{},createdGameAt:x.created_game_at
+        }))
+      },
+      socialGraph,
+      causalGraph,
       world: {
         characters: save.world.characters.slice(0, 80).map(compactCharacter),
         events: save.world.events.slice(0, 80),
@@ -423,6 +454,19 @@ async function executeActions(userId, runtime, save, actions) {
         saveChanged = true;
         executed.push(summarizeAction(type, `${count} variables ocultas ajustadas.`));
       }
+    }
+
+    if (['register_cause','schedule_consequence','cancel_consequence','link_causal'].includes(type)) {
+      const actionMap={
+        register_cause:{action:'register_cause',...args},
+        schedule_consequence:{action:'schedule_consequence',...args},
+        cancel_consequence:{action:'cancel_consequence',...args},
+        link_causal:{action:'link',...args}
+      };
+      const applied=await applyDirectorCausalPlan(userId,{gameNow:new Date(runtime.gameNow),causalActions:[actionMap[type]]});
+      if(applied.length)executed.push(summarizeAction(type, applied[0]?.consequence?.summary||applied[0]?.node?.summary||`Acción causal ${type} ejecutada.`));
+      else executed.push(summarizeAction(type, `No se pudo aplicar la acción causal ${type}.`));
+      continue;
     }
   }
 
