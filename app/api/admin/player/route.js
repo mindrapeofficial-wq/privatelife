@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isCurrentAdmin } from '../../../../lib/auth.js';
 import { ensureSchema, query } from '../../../../lib/db.js';
+import { resolveRoutineState } from '../../../../lib/life-routines.js';
 
 export const runtime = 'nodejs';
 
@@ -42,6 +43,24 @@ export async function GET(request) {
       [userId]
     );
 
+    const clockResult=await query(`SELECT speed,paused,timezone,
+      CASE WHEN paused THEN anchor_game_at
+        ELSE anchor_game_at + ((NOW()-anchor_real_at)*speed)
+      END AS game_now
+      FROM private_life.world_clock WHERE user_id=$1 LIMIT 1`,[userId]);
+    const clock=clockResult.rows[0]||{speed:1,paused:false,timezone:'UTC',game_now:new Date()};
+    const save=row.save_data||{};
+    const lifeCharacters=(Array.isArray(save?.world?.characters)?save.world.characters:[]).map(character=>({
+      id:String(character?.id||''),
+      name:String(character?.name||'Personaje'),
+      ...resolveRoutineState(character?.routine,new Date(clock.game_now),{
+        occupation:character?.occupation||'',
+        city:character?.location||save?.identity?.city||'',
+        timezone:clock.timezone||'UTC',
+        characterKey:'admin:'+String(character?.id||character?.name||'npc')
+      })
+    }));
+
     return NextResponse.json({
       player: {
         id: String(row.id),
@@ -70,6 +89,13 @@ export async function GET(request) {
             createdAt: x.created_at,
             readAt: x.read_at,
           })),
+        },
+        life:{
+          gameNow:clock.game_now,
+          timezone:clock.timezone||'UTC',
+          speed:Number(clock.speed)||1,
+          paused:!!clock.paused,
+          characters:lifeCharacters,
         },
       },
     });
