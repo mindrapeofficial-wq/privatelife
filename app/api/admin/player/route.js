@@ -49,9 +49,11 @@ export async function GET(request) {
       END AS game_now
       FROM private_life.world_clock WHERE user_id=$1 LIMIT 1`,[userId]);
     const clock=clockResult.rows[0]||{speed:1,paused:false,timezone:'UTC',game_now:new Date()};
-    const [playerContextResult,lifeEventsResult]=await Promise.all([
+    const [playerContextResult,lifeEventsResult,autonomyStateResult,autonomyEventsResult]=await Promise.all([
       query('SELECT location_key,location_label,activity_key,activity_label,availability,social_exposure,privacy,started_game_at,expected_until_game_at,revision,last_evaluated_game_at,next_evaluation_game_at,updated_at FROM private_life.player_context WHERE user_id=$1 LIMIT 1',[userId]),
-      query("SELECT id,event_key,event_type,app,title,body,payload,scheduled_game_at,status,created_at,delivered_at FROM private_life.life_events WHERE user_id=$1 ORDER BY created_at DESC LIMIT 80",[userId])
+      query("SELECT id,event_key,event_type,app,title,body,payload,scheduled_game_at,status,created_at,delivered_at FROM private_life.life_events WHERE user_id=$1 ORDER BY created_at DESC LIMIT 80",[userId]),
+      query("SELECT character_key,next_action_game_at,last_action_game_at,daily_key,daily_count,state_data,updated_at FROM private_life.npc_autonomy_state WHERE user_id=$1 ORDER BY next_action_game_at ASC LIMIT 200",[userId]),
+      query("SELECT id,character_key,character_name,event_type,event_data,game_at,created_at FROM private_life.npc_autonomy_events WHERE user_id=$1 ORDER BY game_at DESC,id DESC LIMIT 120",[userId])
     ]);
     const save=row.save_data||{};
     const lifeCharacters=(Array.isArray(save?.world?.characters)?save.world.characters:[]).map(character=>({
