@@ -441,6 +441,26 @@ export default function AdminPage(){
       || !String(c.secrets||'').trim()
       || !c.routine;
   }
+  async function forceCharacterMessage(){
+    if(!player||!character||busy)return;
+    setBusy(true);
+    try{
+      const data=await api('/api/admin/player',{
+        method:'POST',
+        body:JSON.stringify({userId:player.id,characterId:character.id,action:'force_npc_message'})
+      });
+      await refreshPhone(player.id);
+      await loadAiMind(player.id,{quiet:true});
+      setTab('phone');
+      setNotice((data.message?.contactName||character.name||'El personaje')+' ha enviado un WhatsApp ahora.');
+      setTimeout(()=>setNotice(''),2200);
+    }catch(e){
+      setNotice(e.message);
+    }finally{
+      setBusy(false);
+    }
+  }
+
   async function completeCharacterProcedurally(){
     if(!character||!player)return;
     const generated=proceduralCharacter(character.name||'');
@@ -602,7 +622,10 @@ export default function AdminPage(){
             </div>
             <div className="admin-routine-card">
               <div><b>LIFE ENGINE · RUTINA + AUTONOMÍA</b><span>{(()=>{const live=lifeCharacters.find(x=>String(x.id)===String(character.id));return live?'Ahora: '+live.label+(live.location?' · '+live.location:''):'Estado pendiente de sincronización'})()}</span><span>Laboral: {routineSummary(character.routine,{occupation:character.occupation,city:character.location}).work} · Sueño: {routineSummary(character.routine,{occupation:character.occupation,city:character.location}).sleep}</span><span>{(()=>{const a=lifeAutonomy.find(x=>String(x.characterKey)===('world:'+String(character.id)));return a?.nextActionGameAt?'Próxima iniciativa: '+fmt(a.nextActionGameAt):'Iniciativa: pendiente de inicializar'})()}</span></div>
-              <button type="button" onClick={()=>patchCharacter({routine:buildDefaultRoutine({occupation:character.occupation,city:character.location})})}>✦ Regenerar rutina</button>
+              <div className="admin-sheet-actions">
+                <button type="button" disabled={busy} onClick={forceCharacterMessage}>⚡ Forzar mensaje ahora</button>
+                <button type="button" onClick={()=>patchCharacter({routine:buildDefaultRoutine({occupation:character.occupation,city:character.location})})}>✦ Regenerar rutina</button>
+              </div>
             </div>
             <div className="admin-card-head sub"><span>MEMORIA VIVA + INTENCIONES</span></div>
             <div className="admin-grid">
