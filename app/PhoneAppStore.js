@@ -136,7 +136,7 @@ export default function PhoneAppStore({installed=[],onInstall,onOpenApp,onClose}
   return <div className="app-window app-app-store native-window store-shell">
     <div className="store-status"><b>9:41</b><span>● ◔ 100%</span></div>
     <header className="store-topbar">
-      <button onClick={onClose} type="button" aria-label="Cerrar App Store">‹</button>
+      <button className="store-back pl-unified-back" onClick={onClose} type="button" aria-label="Volver">‹</button>
       <div><small>APP STORE</small><b>{tab==='today'?'Hoy':tab==='apps'?'Apps':'Buscar'}</b></div>
       <span className="store-avatar">P</span>
     </header>
