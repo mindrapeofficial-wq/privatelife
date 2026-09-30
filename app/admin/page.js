@@ -654,6 +654,16 @@ export default function AdminPage(){
             </div>
 
             <div className="admin-card">
+              <div className="admin-card-head"><span>SEÑALES SOCIALES ANALIZADAS</span></div>
+              <div className="admin-ai-observations">
+                {(aiRun?.context?.socialAnalysis?.activeTensions||socialGraph?.analytics?.activeTensions||[]).slice(0,3).map((x,i)=><div key={'t'+i}><i>!</i><p>Tensión: {x.aKey} ↔ {x.bKey} · {x.tension}</p></div>)}
+                {(aiRun?.context?.socialAnalysis?.socialHubs||socialGraph?.analytics?.socialHubs||[]).slice(0,3).map((x,i)=><div key={'h'+i}><i>•</i><p>Hub social: {x.characterKey} · {x.connections} conexiones</p></div>)}
+                {(aiRun?.context?.socialAnalysis?.spreadingInformation||socialGraph?.analytics?.spreadingInformation||[]).slice(0,3).map((x,i)=><div key={'i'+i}><i>↗</i><p>Información circulando: {x.content} · {x.holderCount} personas</p></div>)}
+                {!((aiRun?.context?.socialAnalysis?.activeTensions||socialGraph?.analytics?.activeTensions||[]).length||(aiRun?.context?.socialAnalysis?.socialHubs||socialGraph?.analytics?.socialHubs||[]).length||(aiRun?.context?.socialAnalysis?.spreadingInformation||socialGraph?.analytics?.spreadingInformation||[]).length)&&<div className="admin-empty">Todavía no hay señales sociales suficientes para destacar patrones.</div>}
+              </div>
+            </div>
+
+            <div className="admin-card">
               <div className="admin-card-head"><span>LECTURA DE LA IA</span></div>
               <div className="admin-ai-observations">
                 {(aiRun?.observations||aiMind?.state?.lastPlan?.observations||[]).map((x,i)=><div key={i}><i>{i+1}</i><p>{String(x)}</p></div>)}
