@@ -1,80 +1,59 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import './notas.css';
 
-const CHAPTER_LENGTH=5;
-const SCENES=[
-  {
-    title:'Una notificación fuera de hora',
-    text:(name,contact)=>`${name||'Tu personaje'} lleva unos minutos mirando el teléfono sin hacer nada concreto. Entonces vibra. ${contact?`El nombre de ${contact} aparece en la pantalla.`:'Hay una notificación nueva de alguien que no esperabas.'} No parece importante, pero hay algo en el momento que hace que no la ignores del todo.`,
-    choices:[
-      ['Abrirla inmediatamente',{curiosity:2,initiative:1}],
-      ['Esperar un poco antes de mirar',{caution:2,selfControl:1}],
-      ['Mirar la vista previa sin entrar',{curiosity:1,caution:1}],
-      ['Dejar el móvil boca abajo',{independence:2,caution:1}]
-    ]
-  },
-  {
-    title:'Lo que dices y lo que dejas sin decir',
-    text:(name,contact,last)=>`${last?`La decisión anterior todavía pesa un poco: ${last.toLowerCase()}. `:''}La conversación avanza de una forma que no estaba prevista. ${contact||'La otra persona'} deja una frase suficientemente ambigua como para poder interpretarla de varias maneras. Aquí no existe una respuesta perfecta.`,
-    choices:[
-      ['Preguntar directamente qué quiere decir',{initiative:2,clarity:2}],
-      ['Responder con humor y tantear el terreno',{social:2,curiosity:1}],
-      ['Cambiar de tema',{caution:2,distance:1}],
-      ['No responder todavía',{selfControl:2,distance:1}]
-    ]
-  },
-  {
-    title:'Una puerta entreabierta',
-    text:(name,contact)=>`Horas después aparece una posibilidad pequeña, pero real: seguir acercándote a ${contact||'esa persona'}, mantener las cosas como están o dejar que el momento pase. Mientras tú decides, el resto del mundo de PRIVATE LIFE continúa moviéndose fuera de tu pantalla.`,
-    choices:[
-      ['Dar un paso hacia esa persona',{initiative:3,attachment:1}],
-      ['Mantener el tono actual',{stability:2,caution:1}],
-      ['Tomar distancia',{independence:2,distance:2}],
-      ['Hacer algo inesperado',{novelty:3,curiosity:1}]
-    ]
-  },
-  {
-    title:'El efecto de una ausencia',
-    text:()=>`Pasa tiempo sin novedades. El silencio también es una acción, aunque nadie lo haya elegido de forma explícita. PRIVATE LIFE no congela a los demás mientras tú esperas: sus vínculos, estados de ánimo y decisiones siguen su curso en segundo plano.`,
-    choices:[
-      ['Escribir tú primero',{initiative:3,attachment:1}],
-      ['Esperar a que la otra persona aparezca',{caution:2,selfControl:2}],
-      ['Centrarte en otra persona o actividad',{independence:3,novelty:1}],
-      ['Releer lo ocurrido antes de decidir',{analysis:3,caution:1}]
-    ]
-  },
-  {
-    title:'Fin de capítulo',
-    text:()=>`No todas las consecuencias son visibles todavía. Algunas decisiones han cambiado la forma en que otros personajes pueden interpretarte y otras han alterado relaciones que todavía no has visto. El capítulo termina, pero la simulación no se detiene.`,
-    choices:[
-      ['Cerrar el capítulo y continuar',{stability:1}],
-      ['Cerrar el capítulo pensando en lo ocurrido',{analysis:2}],
-      ['Cerrar el capítulo y buscar algo nuevo',{novelty:2}],
-      ['Cerrar el capítulo sin mirar atrás',{independence:2}]
-    ]
-  }
-];
-
-function clamp(n){return Math.max(-100,Math.min(100,n||0))}
+const CONTACTS='private-life-contacts';
+const EVENTS='private-life-narrative-events-v1';
+const WHATSAPP='private-life-whatsapp-v1';
+function read(key,fallback){try{const x=JSON.parse(localStorage.getItem(key)||'null');return x??fallback}catch{return fallback}}
 function getName(save){return save?.identity?.name||save?.character?.name||save?.profile?.name||save?.name||''}
-function getContacts(){try{return JSON.parse(localStorage.getItem('private-life-contacts')||'[]')}catch{return []}}
+function snapshot(){
+ const contacts=read(CONTACTS,[]), chats=read(WHATSAPP,{}), events=read(EVENTS,[]);
+ const safeContacts=(Array.isArray(contacts)?contacts:[]).filter(c=>c?.name&&Number(c?.age)>=18).slice(0,12).map(c=>({
+   id:c.id,name:c.name,age:c.age,city:c.city,relationshipType:c.relationshipType,relation:c.relation,affection:c.affection,
+   profile:c.profile,notes:c.notes,engineContext:c.engineContext,masterSheet:c.masterSheet,conversation:String(c.conversation||'').slice(0,12000),
+   photoCount:Array.isArray(c.photos)?c.photos.length:0
+ }));
+ const whatsapp=safeContacts.map(c=>({contactName:c.name,messages:Array.isArray(chats?.[c.id]?.messages)?chats[c.id].messages.slice(-18).map(m=>({side:m.side,type:m.type,text:String(m.text||'').slice(0,700),createdAt:m.createdAt})):[]})).filter(x=>x.messages.length);
+ return {contacts:safeContacts,narrativeEvents:(Array.isArray(events)?events:[]).slice(0,100),whatsapp};
+}
+function applyEffects(payload){
+ const effects=Array.isArray(payload?.effects)?payload.effects:[];
+ const contacts=read(CONTACTS,[]), chats=read(WHATSAPP,{});
+ for(const e of effects){
+   if(e?.type==='whatsapp_message'&&e.contactName&&e.text){
+     const c=(Array.isArray(contacts)?contacts:[]).find(x=>String(x.name||'').toLowerCase()===String(e.contactName).toLowerCase());
+     if(c){const chat=chats[c.id]||{messages:[],unread:0};chat.messages=[...(chat.messages||[]),{id:crypto.randomUUID?.()||String(Date.now()),side:'in',type:'text',text:String(e.text).slice(0,1000),createdAt:new Date().toISOString(),central:true}].slice(-350);chat.unread=(chat.unread||0)+1;chats[c.id]=chat}
+   }
+ }
+ try{localStorage.setItem(WHATSAPP,JSON.stringify(chats))}catch{}
+ for(const n of Array.isArray(payload?.notifications)?payload.notifications:[]){window.privateLifeNotify?.({app:n.app||'PRIVATE LIFE',title:n.title||n.app||'PRIVATE LIFE',body:n.body||'',priority:n.priority||'normal'})}
+}
 
 export default function Notes(){
-  const [save,setSave]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [mode,setMode]=useState('notes');const [busy,setBusy]=useState(false);
-  useEffect(()=>{(async()=>{try{const r=await fetch('/api/save',{cache:'no-store'});if(!r.ok)throw new Error('No se pudo cargar la partida.');const x=await r.json();setSave(x.save);if(x.save?.gameplay?.narratorMode)setMode('narrator')}catch(e){setError(e.message)}finally{setLoading(false)}})()},[]);
-  const narrator=save?.narrator||{chapter:1,turn:0,history:[],hidden:{}};
-  const contacts=useMemo(()=>getContacts(),[mode]);
-  const contact=contacts.length?contacts[(narrator.chapter-1)%contacts.length]?.name:'';
-  const scene=SCENES[narrator.turn%CHAPTER_LENGTH];
-  const last=narrator.history?.at?.(-1)?.choice||'';
-  async function write(next){setBusy(true);try{const r=await fetch('/api/save',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({save:next})});if(!r.ok)throw new Error('No se pudo guardar el modo Narrador.');setSave(next)}catch(e){setError(e.message)}finally{setBusy(false)}}
-  async function activate(){if(!save)return;const next={...save,gameplay:{...(save.gameplay||{}),narratorMode:true,narratorActivatedAt:save.gameplay?.narratorActivatedAt||new Date().toISOString()},narrator:save.narrator||{chapter:1,turn:0,history:[],hidden:{}}};await write(next);setMode('narrator')}
-  async function deactivate(){if(!save)return;const next={...save,gameplay:{...(save.gameplay||{}),narratorMode:false}};await write(next);setMode('notes')}
-  async function choose(choice,effects){if(busy)return;const old=save.narrator||{chapter:1,turn:0,history:[],hidden:{}};const hidden={...(old.hidden||{})};Object.entries(effects||{}).forEach(([k,v])=>hidden[k]=clamp((hidden[k]||0)+v));const isEnd=(old.turn%CHAPTER_LENGTH)===CHAPTER_LENGTH-1;const entry={chapter:old.chapter,turn:old.turn,scene:scene.title,choice,at:new Date().toISOString()};const nextNarrator={chapter:isEnd?old.chapter+1:old.chapter,turn:old.turn+1,history:[...(old.history||[]),entry].slice(-100),hidden};await write({...save,narrator:nextNarrator});}
-  if(loading)return <main className="notesLoading">Abriendo Notas…</main>;
-  if(error&&!save)return <main className="notesLoading"><div>{error}</div><button onClick={()=>location.href='/'}>VOLVER</button></main>;
-  if(mode==='narrator')return <main className="narrator"><header className="narratorTop"><button className="pl-unified-back" aria-label="Volver" onClick={()=>location.href='/'}>‹</button><div><small>MODO NARRADOR</small><b>Capítulo {narrator.chapter}</b></div><button className="exit" onClick={deactivate}>SALIR</button></header><div className="narratorBody"><div className="chapterMark">PRIVATE LIFE · CAPÍTULO {narrator.chapter}</div><article className="story"><span>PARTE {(narrator.turn%CHAPTER_LENGTH)+1}</span><h1>{scene.title}</h1><p>{scene.text(getName(save),contact,last)}</p></article><div className="choices">{scene.choices.map(([label,effects],i)=><button key={label} disabled={busy} onClick={()=>choose(label,effects)}><i>{String.fromCharCode(65+i)}</i><span>{label}</span></button>)}</div><p className="hiddenHint">Las decisiones modifican variables, relaciones y posibilidades ocultas. Otros personajes pueden vivir acontecimientos en paralelo aunque no aparezcan en esta escena.</p>{narrator.history?.length>0&&<details className="history"><summary>Decisiones anteriores</summary>{narrator.history.slice(-8).reverse().map((h,i)=><div key={`${h.at}-${i}`}><small>Cap. {h.chapter}</small><span>{h.choice}</span></div>)}</details>}</div></main>;
-  return <main className="notesApp"><header className="notesTop"><button className="pl-unified-back" aria-label="Volver" onClick={()=>location.href='/'}>‹</button><b>Notas</b><span>•••</span></header><div className="notesTitle"><h1>Notas</h1><button>＋</button></div><section className="noteCard narratorNote"><div className="noteIcon">N</div><div><small>PRIVATE LIFE</small><h2>Modo Narrador</h2><p>Convierte la partida en una novela interactiva. El narrador describe escenas, tú eliges qué hacer y el mundo continúa evolucionando en segundo plano.</p></div></section><section className="modePanel"><div className="modeHead"><div><small>MODO DE JUEGO</small><h2>Narración interactiva</h2></div><span className="off">DESACTIVADO</span></div><p>Al activarlo, las decisiones se presentan como capítulos y opciones A, B, C y D. Las variables psicológicas y sociales siguen ocultas, y las consecuencias pueden ser positivas, negativas o inesperadas.</p><ul><li>Capítulos y escenas narradas</li><li>Decisiones con consecuencias reales</li><li>Relaciones y sucesos paralelos no visibles</li><li>Continuidad con tu personaje, contactos y partida</li></ul><button disabled={busy||!save} onClick={activate}>ACTIVAR MODO NARRADOR</button></section>{error&&<div className="notesError">{error}</div>}</main>;
+ const [save,setSave]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[mode,setMode]=useState('notes'),[busy,setBusy]=useState(false);
+ const started=useRef(false);
+ useEffect(()=>{(async()=>{try{const r=await fetch('/api/save',{cache:'no-store'});if(!r.ok)throw new Error('No se pudo cargar la partida.');const x=await r.json();setSave(x.save);if(x.save?.gameplay?.narratorMode)setMode('narrator')}catch(e){setError(e.message)}finally{setLoading(false)}})()},[]);
+ const narrator=save?.narrator||{chapter:1,turn:0,history:[],hidden:{},currentScene:null};
+ const scene=narrator.currentScene||null;
+ const contacts=useMemo(()=>snapshot().contacts,[mode,save?.social?.contactsUpdatedAt]);
+ async function write(next){setBusy(true);try{const r=await fetch('/api/save',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({save:next})});const x=await r.json().catch(()=>({}));if(!r.ok)throw new Error(x.error||'No se pudo guardar el modo Narrador.');setSave(next);return next}catch(e){setError(e.message);return null}finally{setBusy(false)}}
+ async function generate(action='start',choice=''){
+   if(busy)return;setBusy(true);setError('');
+   try{
+     const r=await fetch('/api/narrator',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,choice,clientContext:snapshot()})});
+     const x=await r.json().catch(()=>({}));if(!r.ok)throw new Error(x.error||'No se pudo generar la historia.');
+     applyEffects(x);setSave(x.save);return x;
+   }catch(e){setError(e.message);return null}finally{setBusy(false)}
+ }
+ useEffect(()=>{if(mode!=='narrator'||!save||scene||started.current)return;started.current=true;generate('start')},[mode,save,scene]);
+ async function activate(){if(!save)return;const next={...save,gameplay:{...(save.gameplay||{}),narratorMode:true,narratorActivatedAt:save.gameplay?.narratorActivatedAt||new Date().toISOString()},narrator:save.narrator||{chapter:1,turn:0,history:[],hidden:{},currentScene:null}};const ok=await write(next);if(ok){setMode('narrator');started.current=true;await generate('start')}}
+ async function deactivate(){if(!save)return;const next={...save,gameplay:{...(save.gameplay||{}),narratorMode:false}};await write(next);setMode('notes');started.current=false}
+ async function choose(label){if(busy||!scene)return;await generate('continue',label)}
+ if(loading)return <main className="notesLoading">Abriendo Notas…</main>;
+ if(error&&!save)return <main className="notesLoading"><div>{error}</div><button onClick={()=>location.href='/'}>VOLVER</button></main>;
+ if(mode==='narrator')return <main className="narrator"><header className="narratorTop"><button className="pl-unified-back" aria-label="Volver" onClick={()=>location.href='/'}>‹</button><div><small>MODO NARRADOR</small><b>Capítulo {narrator.chapter}</b></div><button className="exit" onClick={deactivate}>SALIR</button></header><div className="narratorBody"><div className="chapterMark">PRIVATE LIFE · CAPÍTULO {narrator.chapter}</div>{!scene?<article className="story"><span>IA CENTRAL</span><h1>{busy?'Construyendo tu historia…':'El mundo está esperando'}</h1><p>{busy?'Reuniendo tu personaje, perfil, contactos, fichas maestras, conversaciones, actividad reciente y estado del mundo para decidir qué ocurre a continuación.':'Pulsa continuar para volver a sincronizar la historia con tu partida.'}</p>{!busy&&<button onClick={()=>generate('start')}>CONTINUAR</button>}</article>:<><article className="story"><span>PARTE {(narrator.turn%5)+1}</span><h1>{scene.title}</h1><p>{scene.text}</p></article><div className="choices">{(scene.choices||[]).map((choice,i)=><button key={`${choice.label}-${i}`} disabled={busy} onClick={()=>choose(choice.label)}><i>{String.fromCharCode(65+i)}</i><span>{choice.label}</span></button>)}</div></>}
+ <p className="hiddenHint">La narración comparte el mismo mundo que tus contactos y aplicaciones. Tus decisiones alimentan variables y acontecimientos persistentes, y la actividad del teléfono vuelve a entrar en la siguiente escena.</p>{error&&<div className="notesError">{error}</div>}{narrator.history?.length>0&&<details className="history"><summary>Decisiones anteriores</summary>{narrator.history.slice(-8).reverse().map((h,i)=><div key={`${h.at}-${i}`}><small>Cap. {h.chapter}</small><span>{h.choice}</span></div>)}</details>}</div></main>;
+ return <main className="notesApp"><header className="notesTop"><button className="pl-unified-back" aria-label="Volver" onClick={()=>location.href='/'}>‹</button><b>Notas</b><span>•••</span></header><div className="notesTitle"><h1>Notas</h1><button>＋</button></div><section className="noteCard narratorNote"><div className="noteIcon">N</div><div><small>PRIVATE LIFE</small><h2>Modo Narrador</h2><p>Convierte la misma partida en una novela interactiva conectada con tu personaje, contactos, conversaciones y acontecimientos del teléfono.</p></div></section><section className="modePanel"><div className="modeHead"><div><small>MODO DE JUEGO</small><h2>Narración conectada al mundo</h2></div><span className="off">DESACTIVADO</span></div><p>Al activarlo, el motor central reúne el contexto acumulado y genera una historia persistente. Las decisiones no viven en una burbuja: modifican el mismo mundo que usan Contactos, WhatsApp, eventos y el Director.</p><ul><li>Perfil profundo del jugador y variables ocultas</li><li>{contacts.length} contactos disponibles para continuidad narrativa</li><li>Fichas maestras y conversaciones como contexto</li><li>Actividad reciente de apps y decisiones anteriores</li></ul><button disabled={busy||!save} onClick={activate}>{busy?'PREPARANDO…':'ACTIVAR MODO NARRADOR'}</button></section>{error&&<div className="notesError">{error}</div>}</main>;
 }
