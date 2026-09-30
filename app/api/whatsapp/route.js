@@ -3,7 +3,7 @@ import { getCurrentUser } from '../../../lib/auth.js';
 import { ensureSchema, query } from '../../../lib/db.js';
 import { runCentralModel } from '../../../lib/central-ai-provider.js';
 import { resolveRoutineState } from '../../../lib/life-routines.js';
-import { characterMemoryKey, loadMindContext, persistExchangeMind } from '../../../lib/life-memory.js';
+import { characterMemoryKey, loadMindContext, persistExchangeMind, forgetLowValueMemories } from '../../../lib/life-memory.js';
 
 export const runtime = 'nodejs';
 
@@ -478,6 +478,7 @@ export async function POST(request) {
       memoryConfig:context.memoryConfig,
       sourceRef:String(messageRef)
     });
+    await forgetLowValueMemories(user.id,context.characterKey,new Date(context.clock.game_now),context.memoryConfig);
 
     if (context.character) {
       const updated = applyDeltas(context.character, delta);
