@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from 'react';
 const STORAGE_KEY='private-life-contacts';
 const relationshipTypes=['Amistad','Familiar','Pareja','Expareja','Conocido/a','Compañero/a','Otro'];
 const sourceTypes=['Persona real','Personaje IA','Jugador'];
-const blank={id:'',name:'',age:'',city:'',relationshipType:'Amistad',relation:'',affection:50,notes:'',conversation:'',photos:[],profile:'',consent:false,test:[],sourceType:'Persona real'};
+const blank={id:'',name:'',age:'',city:'',relationshipType:'Amistad',relation:'',affection:50,notes:'',conversation:'',photos:[],profile:'',consent:false,test:[],sourceType:'Persona real',masterSheet:null,engineContext:''};
+const STOP=new Set('que de la el en y a los las un una unos unas por para con sin del al lo se es son era eran fue fueron ser estar como pero si no ya yo tu tú te me mi mis su sus le les nos os esto esta este estas estos esa ese esas esos muy mas más menos hay cuando donde dónde quien quién porque porqué qué cual cuál o e u ni tan todo toda todos todas algo nada también tambien solo sólo desde hasta sobre entre tiene tienen tengo tienes hacer hace hacen hecho bien mal ahora luego hoy ayer mañana aqui aquí ahi ahí alli allí vamos voy va van puedo puede pueden quiero quiere quieren pues vale hola gracias jaja jajaja haha hahaha xd xdd the and that this with from for you your are was were have has had not but what when where who why how just very can could would should'.split(/\s+/));
+const BLOCKED=new Set('religion religión religioso religiosa musulman musulmán cristiano cristiana judío judia judía politica política político partido voto votar sexual sexo orientación orientacion gay lesbiana bisexual trans salud enfermedad enfermo enferma diagnostico diagnóstico medicacion medicación droga drogas'.split(/\s+/));
 const test=[
  ['Cuando está con gente que no conoce suele...',['Hablar enseguida','Observar antes de entrar','Esperar a que le hablen','Depende mucho del ambiente']],
  ['Cuando algo le molesta normalmente...',['Lo dice directamente','Lo deja caer','Se lo guarda un tiempo','Se distancia']],
@@ -19,129 +21,34 @@ const test=[
  ['¿Qué describe mejor su forma de comunicarse?',['Directa','Detallista','Breve','Emocional','Cambiante según la persona']]
 ];
 
-function testSummary(values){
- const picks=values.map((v,i)=>test[i]?.[1]?.[v]).filter(Boolean);
- return picks.length?`Perfil orientativo basado en lo que conoce el jugador: ${picks.join('; ')}. Esta descripción es una hipótesis editable, no un diagnóstico ni una verdad objetiva sobre la persona.`:'';
-}
-function normalized(c){
- return {...blank,...c,relationshipType:c.relationshipType||'Amistad',sourceType:c.sourceType||c.kind||(c.isAI?'Personaje IA':c.isUser?'Jugador':'Persona real'),affection:Number.isFinite(Number(c.affection))?Number(c.affection):50,photos:Array.isArray(c.photos)?c.photos:[]};
-}
-function Avatar({contact,size='normal'}){
- const photo=contact?.photos?.[0];
- return photo?<img className={'nc-avatar '+size} src={photo} alt=""/>:<div className={'nc-avatar nc-initial '+size}>{(contact?.name||'?').trim().charAt(0).toUpperCase()}</div>;
-}
+function testSummary(values){const picks=values.map((v,i)=>test[i]?.[1]?.[v]).filter(Boolean);return picks.length?`Perfil orientativo basado en lo que conoce el jugador: ${picks.join('; ')}. Esta descripción es una hipótesis editable, no un diagnóstico ni una verdad objetiva sobre la persona.`:''}
+function normalized(c){return {...blank,...c,relationshipType:c.relationshipType||'Amistad',sourceType:c.sourceType||c.kind||(c.isAI?'Personaje IA':c.isUser?'Jugador':'Persona real'),affection:Number.isFinite(Number(c.affection))?Number(c.affection):50,photos:Array.isArray(c.photos)?c.photos:[],masterSheet:c.masterSheet&&typeof c.masterSheet==='object'?c.masterSheet:null}}
+function words(text){return String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/https?:\/\/\S+/g,' ').replace(/[^a-záéíóúüñ0-9\s]/gi,' ').split(/\s+/).filter(x=>x.length>3&&!STOP.has(x)&&!BLOCKED.has(x)&&!/^[0-9]+$/.test(x))}
+function terms(messages,limit=12){const m=new Map();messages.forEach(t=>words(t).forEach(w=>m.set(w,(m.get(w)||0)+1)));return [...m.entries()].sort((a,b)=>b[1]-a[1]).slice(0,limit).map(([term,count])=>({term,count}))}
+function localMaster(contact){const raw=String(contact.conversation||'').split(/\n+/).map(x=>x.trim()).filter(Boolean),key=String(contact.name||'').toLowerCase();let mine=raw.filter(line=>{const plain=line.replace(/^\[[^\]]+\]\s*/,''),i=plain.indexOf(':');return i>0&&plain.slice(0,i).trim().toLowerCase()===key}).map(line=>line.replace(/^\[[^\]]+\]\s*/, '').replace(/^[^:]{1,80}:\s*/,''));if(!mine.length)mine=raw.map(line=>line.replace(/^\[[^\]]+\]\s*/, '').replace(/^[^:]{1,80}:\s*/,''));mine=mine.filter(Boolean).slice(0,500);const chars=mine.reduce((n,x)=>n+x.length,0),avg=Math.round(chars/Math.max(1,mine.length)),questions=mine.reduce((n,x)=>n+(x.match(/\?/g)||[]).length,0),emoji=mine.reduce((n,x)=>n+(x.match(/[\u{1F300}-\u{1FAFF}]/gu)||[]).length,0),exclamations=mine.reduce((n,x)=>n+(x.match(/!/g)||[]).length,0),style=[avg<28?'Suele escribir mensajes breves':avg>120?'Suele escribir mensajes largos':'Longitud de mensaje intermedia'];if(questions>Math.max(2,mine.length*.12))style.push('Hace preguntas con frecuencia');if(emoji>Math.max(3,mine.length*.12))style.push('Uso frecuente de emojis');if(exclamations>Math.max(2,mine.length*.1))style.push('Uso visible de exclamaciones');const vocabulary=terms(mine),examples=mine.filter(x=>x.length>=4&&!/https?:\/\//i.test(x)).sort((a,b)=>Math.abs(a.length-avg)-Math.abs(b.length-avg)).slice(0,6).map(text=>({text:text.slice(0,220),date:''}));return {version:1,generatedAt:new Date().toISOString(),basis:'Conversación aportada por el jugador',confidence:mine.length>=300?'Alta':mine.length>=80?'Media':'Baja',evidence:{sharedMessages:raw.length,sentMessages:mine.length,threads:1},communication:{averageChars:avg,questionRate:Math.round(questions/Math.max(1,mine.length)*100),emojiRate:Math.round(emoji/Math.max(1,mine.length)*100),exclamationRate:Math.round(exclamations/Math.max(1,mine.length)*100),activeTime:'Sin datos horarios',styleSignals:style},vocabulary,recurringTerms:vocabulary.slice(0,8),writingExamples:examples,conversationAnchors:raw.filter(x=>x.length>55).slice(0,6).map(text=>({speaker:'Conversación',text:text.slice(0,260),date:''})),manual:{confirmedMemories:'',goals:'',limits:'',explicitBeliefs:'',privateContext:''}}}
+function engineContext(contact,master){if(!master)return'';const man=master.manual||{};return [`PERSONA: ${contact.name}. ${contact.age?contact.age+' años. ':''}${contact.city?contact.city+'. ':''}`,`Relación declarada por el jugador: ${contact.relationshipType||'sin especificar'}${contact.relation?' ('+contact.relation+')':''}. Afecto inicial ${Number(contact.affection)||0}%.`,`Base de evidencia: ${master.evidence?.sentMessages||0} mensajes propios; confianza ${master.confidence||'sin valorar'}.`,`Forma de escribir observada: ${(master.communication?.styleSignals||[]).join('; ')||'sin datos suficientes'}.`,`Vocabulario recurrente no sensible: ${(master.vocabulary||[]).map(x=>x.term).join(', ')||'sin datos suficientes'}.`,`Ejemplos literales: ${(master.writingExamples||[]).slice(0,5).map(x=>'“'+String(x.text||'').replace(/\s+/g,' ').slice(0,140)+'”').join(' | ')||'sin ejemplos suficientes'}.`,man.confirmedMemories?`Recuerdos confirmados por el jugador: ${man.confirmedMemories}`:'',man.goals?`Objetivos/contexto confirmado: ${man.goals}`:'',man.limits?`Límites confirmados: ${man.limits}`:'',man.explicitBeliefs?`Creencias expresadas explícitamente: ${man.explicitBeliefs}`:'',man.privateContext?`Contexto privado aportado por el jugador: ${man.privateContext}`:'','No inventar atributos sensibles, diagnósticos, secretos ni recuerdos no respaldados por la ficha.'].filter(Boolean).join('\n')}
+function Avatar({contact,size='normal'}){const photo=contact?.photos?.[0];return photo?<img className={'nc-avatar '+size} src={photo} alt=""/>:<div className={'nc-avatar nc-initial '+size}>{(contact?.name||'?').trim().charAt(0).toUpperCase()}</div>}
 
 export default function ContactsApp({onClose}){
- const [contacts,setContacts]=useState([]);
- const [mode,setMode]=useState('list');
- const [selected,setSelected]=useState(null);
- const [editing,setEditing]=useState(null);
- const [draft,setDraft]=useState(blank);
- const [query,setQuery]=useState('');
- const [testIndex,setTestIndex]=useState(0);
-
+ const [contacts,setContacts]=useState([]),[mode,setMode]=useState('list'),[selected,setSelected]=useState(null),[editing,setEditing]=useState(null),[draft,setDraft]=useState(blank),[query,setQuery]=useState(''),[testIndex,setTestIndex]=useState(0);
  useEffect(()=>{try{const stored=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');setContacts(Array.isArray(stored)?stored.map(normalized):[])}catch{}},[]);
  function persist(next){setContacts(next);try{localStorage.setItem(STORAGE_KEY,JSON.stringify(next))}catch{}}
  function newContact(){setEditing(null);setDraft({...blank,id:crypto.randomUUID?.()||String(Date.now())});setTestIndex(0);setMode('edit')}
  function editContact(c){setEditing(c.id);setDraft(normalized(c));setTestIndex(0);setMode('edit')}
- function save(){
-   if(!draft.name.trim()||Number(draft.age)<18||!draft.consent)return;
-   const item={...draft,name:draft.name.trim(),affection:Math.max(0,Math.min(100,Number(draft.affection)||0)),profile:draft.profile.trim()||testSummary(draft.test),updatedAt:new Date().toISOString()};
-   const next=editing?contacts.map(c=>c.id===editing?item:c):[...contacts,item];
-   persist(next);setSelected(item);setMode('detail');
- }
+ function regenerateMaster(){if(!draft.conversation.trim())return;const master=localMaster(draft);setDraft(d=>({...d,masterSheet:master,engineContext:engineContext(d,master)}))}
+ function updateManual(key,value){setDraft(d=>{const master=d.masterSheet||localMaster(d);return {...d,masterSheet:{...master,manual:{...(master.manual||{}),[key]:value}}}})}
+ function save(){if(!draft.name.trim()||Number(draft.age)<18||!draft.consent)return;const master=draft.masterSheet||(draft.conversation.trim()?localMaster(draft):null),item={...draft,name:draft.name.trim(),affection:Math.max(0,Math.min(100,Number(draft.affection)||0)),profile:draft.profile.trim()||testSummary(draft.test),masterSheet:master,engineContext:engineContext(draft,master),updatedAt:new Date().toISOString()},next=editing?contacts.map(c=>c.id===editing?item:c):[...contacts,item];persist(next);setSelected(item);setMode('detail')}
  function remove(id){if(!confirm('¿Eliminar este contacto de PRIVATE LIFE?'))return;persist(contacts.filter(c=>c.id!==id));setSelected(null);setMode('list')}
  function photo(file){if(!file)return;const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas'),max=600,s=Math.min(1,max/Math.max(img.width,img.height));c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);setDraft(d=>({...d,photos:[...d.photos,c.toDataURL('image/jpeg',.72)].slice(0,5)}))};img.src=r.result};r.readAsDataURL(file)}
- function history(file){if(!file)return;const r=new FileReader();r.onload=()=>setDraft(d=>({...d,conversation:String(r.result).slice(0,60000)}));r.readAsText(file)}
+ function history(file){if(!file)return;const r=new FileReader();r.onload=()=>setDraft(d=>({...d,conversation:String(r.result).slice(0,60000),masterSheet:null,engineContext:''}));r.readAsText(file)}
  function answer(n){const a=[...draft.test];a[testIndex]=n;setDraft(d=>({...d,test:a}));if(testIndex<test.length-1)setTestIndex(testIndex+1);else{setDraft(d=>({...d,test:a,profile:d.profile||testSummary(a)}));setMode('edit')}}
- const ready=useMemo(()=>draft.name.trim()&&Number(draft.age)>=18&&draft.consent,[draft]);
- const filtered=useMemo(()=>contacts.filter(c=>!query.trim()||[c.name,c.city,c.relationshipType,c.sourceType].join(' ').toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name,'es')),[contacts,query]);
-
- if(mode==='test'){
-   const q=test[testIndex];
-   return <div className="native-contacts">
-     <NativeBar left="‹" onLeft={()=>setMode('edit')} title="Test básico"/>
-     <div className="nc-scroll nc-test"><div className="nc-step">{testIndex+1} de {test.length}</div><h2>{q[0]}</h2><p>Responde según lo que tú hayas observado. No intenta diagnosticar a la persona.</p><div className="nc-answers">{q[1].map((a,i)=><button key={a} onClick={()=>answer(i)}>{a}</button>)}</div></div>
-   </div>;
- }
-
- if(mode==='edit'){
-   return <div className="native-contacts">
-     <NativeBar left="Cancelar" onLeft={()=>editing?(setSelected(contacts.find(c=>c.id===editing)||null),setMode('detail')):setMode('list')} title={editing?'Editar':'Nuevo contacto'} right="Guardar" onRight={save} rightDisabled={!ready}/>
-     <div className="nc-scroll nc-editor">
-       <section className="nc-photo-editor"><Avatar contact={draft} size="hero"/><label className="nc-change-photo">Añadir foto<input type="file" accept="image/*" onChange={e=>photo(e.target.files?.[0])}/></label></section>
-       <Group title="Información">
-         <Field label="Nombre" value={draft.name} set={v=>setDraft({...draft,name:v})}/>
-         <Field label="Edad" type="number" value={draft.age} set={v=>setDraft({...draft,age:v})}/>
-         <Field label="Ciudad" value={draft.city} set={v=>setDraft({...draft,city:v})}/>
-         <Select label="Tipo" value={draft.sourceType} set={v=>setDraft({...draft,sourceType:v})} options={sourceTypes}/>
-       </Group>
-       <Group title="Relación">
-         <Select label="Relación" value={draft.relationshipType} set={v=>setDraft({...draft,relationshipType:v})} options={relationshipTypes}/>
-         <Field label="Detalle" value={draft.relation} set={v=>setDraft({...draft,relation:v})}/>
-         <div className="nc-range-row"><div><span>Afecto inicial</span><b>{draft.affection}%</b></div><input type="range" min="0" max="100" value={draft.affection} onChange={e=>setDraft({...draft,affection:Number(e.target.value)})}/></div>
-       </Group>
-       <Group title="Fotos">
-         <div className="nc-photo-grid">{draft.photos.map((p,i)=><div className="nc-photo-thumb" key={i}><img src={p} alt=""/><button onClick={()=>setDraft({...draft,photos:draft.photos.filter((_,x)=>x!==i)})}>×</button></div>)}<label className="nc-add-thumb">+<input type="file" accept="image/*" onChange={e=>photo(e.target.files?.[0])}/></label></div>
-       </Group>
-       <Group title="Conversación">
-         <textarea className="nc-textarea large" value={draft.conversation} onChange={e=>setDraft({...draft,conversation:e.target.value.slice(0,60000)})} placeholder="Pega aquí una conversación exportada..."/>
-         <label className="nc-import">Importar TXT / MD<input type="file" accept=".txt,.md,text/plain" onChange={e=>history(e.target.files?.[0])}/></label>
-         <small className="nc-count">{draft.conversation.length.toLocaleString()} / 60.000</small>
-       </Group>
-       <Group title="Ficha del personaje">
-         <textarea className="nc-textarea" value={draft.profile} onChange={e=>setDraft({...draft,profile:e.target.value})} placeholder="Personalidad, forma de hablar, gustos, costumbres, límites, relación contigo..."/>
-         <button className="nc-action-row" onClick={()=>{setTestIndex(0);setMode('test')}}>Hacer test básico <span>›</span></button>
-         <textarea className="nc-textarea small" value={draft.notes} onChange={e=>setDraft({...draft,notes:e.target.value})} placeholder="Notas privadas..."/>
-       </Group>
-       <label className="nc-consent"><input type="checkbox" checked={draft.consent} onChange={e=>setDraft({...draft,consent:e.target.checked})}/><span>Confirmo que tengo permiso para usar aquí las fotos y conversaciones que estoy aportando.</span></label>
-       {Number(draft.age)>0&&Number(draft.age)<18&&<div className="nc-warning">PRIVATE LIFE solo permite personajes adultos de 18 años o más.</div>}
-       <div className="nc-bottom-space"/>
-     </div>
-   </div>;
- }
-
- if(mode==='detail'&&selected){
-   const c=contacts.find(x=>x.id===selected.id)||selected;
-   return <div className="native-contacts">
-     <NativeBar left="‹ Contactos" onLeft={()=>setMode('list')} title="" right="Editar" onRight={()=>editContact(c)}/>
-     <div className="nc-scroll nc-detail">
-       <div className="nc-contact-hero"><Avatar contact={c} size="hero"/><h2>{c.name}</h2><p>{[c.city,c.age?c.age+' años':''].filter(Boolean).join(' · ')}</p>{!c.hideSourceType&&<span className="nc-source-badge">{c.sourceType||'Persona real'}</span>}</div>
-       <div className="nc-quick-actions"><button><i>✉</i><span>mensaje</span></button><button><i>☎</i><span>llamar</span></button><button><i>☆</i><span>favorito</span></button></div>
-       <Group>
-         <Info label="Relación" value={c.relationshipType}/>
-         {c.relation&&<Info label="Detalle" value={c.relation}/>}
-         <Info label="Afecto inicial" value={(Number(c.affection)||0)+'%'}/>
-       </Group>
-       {c.profile&&<Group title="Ficha"><p className="nc-profile-text">{c.profile}</p></Group>}
-       {c.notes&&<Group title="Notas"><p className="nc-profile-text">{c.notes}</p></Group>}
-       <button className="nc-delete" onClick={()=>remove(c.id)}>Eliminar contacto</button>
-       <div className="nc-bottom-space"/>
-     </div>
-   </div>;
- }
-
- return <div className="native-contacts">
-   <NativeBar left="‹" onLeft={onClose} title="Contactos" right="+" onRight={newContact}/>
-   <div className="nc-scroll nc-list-screen">
-     <h1>Contactos</h1>
-     <div className="nc-search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar"/></div>
-     <div className="nc-owner-card"><div className="nc-owner-avatar">YO</div><div><b>Mi tarjeta</b><span>Tu perfil de Private Life</span></div></div>
-     <div className="nc-list-title">CONTACTOS</div>
-     {!filtered.length?<div className="nc-empty"><div className="nc-empty-icon">☷</div><b>Tu agenda está vacía</b><span>Pulsa + para crear tu primer contacto.</span></div>:<div className="nc-contact-list">{filtered.map(c=><button key={c.id} className="nc-contact-row" onClick={()=>{setSelected(c);setMode('detail')}}><Avatar contact={c}/><div><b>{c.name}</b><span>{c.sourceType||'Persona real'}{c.relationshipType?' · '+c.relationshipType:''}</span></div><em>›</em></button>)}</div>}
-     <div className="nc-bottom-space"/>
-   </div>
- </div>;
+ const ready=useMemo(()=>draft.name.trim()&&Number(draft.age)>=18&&draft.consent,[draft]),filtered=useMemo(()=>contacts.filter(c=>!query.trim()||[c.name,c.city,c.relationshipType,c.sourceType].join(' ').toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name,'es')),[contacts,query]);
+ if(mode==='test'){const q=test[testIndex];return <div className="native-contacts"><NativeBar left="‹" onLeft={()=>setMode('edit')} title="Test básico"/><div className="nc-scroll nc-test"><div className="nc-step">{testIndex+1} de {test.length}</div><h2>{q[0]}</h2><p>Responde según lo que tú hayas observado. No intenta diagnosticar a la persona.</p><div className="nc-answers">{q[1].map((a,i)=><button key={a} onClick={()=>answer(i)}>{a}</button>)}</div></div></div>}
+ if(mode==='edit'){const m=draft.masterSheet;return <div className="native-contacts"><NativeBar left="Cancelar" onLeft={()=>editing?(setSelected(contacts.find(c=>c.id===editing)||null),setMode('detail')):setMode('list')} title={editing?'Editar':'Nuevo contacto'} right="Guardar" onRight={save} rightDisabled={!ready}/><div className="nc-scroll nc-editor"><section className="nc-photo-editor"><Avatar contact={draft} size="hero"/><label className="nc-change-photo">Añadir foto<input type="file" accept="image/*" onChange={e=>photo(e.target.files?.[0])}/></label></section><Group title="Información"><Field label="Nombre" value={draft.name} set={v=>setDraft({...draft,name:v})}/><Field label="Edad" type="number" value={draft.age} set={v=>setDraft({...draft,age:v})}/><Field label="Ciudad" value={draft.city} set={v=>setDraft({...draft,city:v})}/><Select label="Tipo" value={draft.sourceType} set={v=>setDraft({...draft,sourceType:v})} options={sourceTypes}/></Group><Group title="Relación"><Select label="Relación" value={draft.relationshipType} set={v=>setDraft({...draft,relationshipType:v})} options={relationshipTypes}/><Field label="Detalle" value={draft.relation} set={v=>setDraft({...draft,relation:v})}/><div className="nc-range-row"><div><span>Afecto inicial</span><b>{draft.affection}%</b></div><input type="range" min="0" max="100" value={draft.affection} onChange={e=>setDraft({...draft,affection:Number(e.target.value)})}/></div></Group><Group title="Fotos"><div className="nc-photo-grid">{draft.photos.map((p,i)=><div className="nc-photo-thumb" key={i}><img src={p} alt=""/><button onClick={()=>setDraft({...draft,photos:draft.photos.filter((_,x)=>x!==i)})}>×</button></div>)}<label className="nc-add-thumb">+<input type="file" accept="image/*" onChange={e=>photo(e.target.files?.[0])}/></label></div></Group><Group title="Conversación"><textarea className="nc-textarea large" value={draft.conversation} onChange={e=>setDraft({...draft,conversation:e.target.value.slice(0,60000),masterSheet:null,engineContext:''})} placeholder="Pega aquí una conversación exportada..."/><label className="nc-import">Importar TXT / MD<input type="file" accept=".txt,.md,text/plain" onChange={e=>history(e.target.files?.[0])}/></label><small className="nc-count">{draft.conversation.length.toLocaleString()} / 60.000</small></Group><Group title="Ficha del personaje"><textarea className="nc-textarea" value={draft.profile} onChange={e=>setDraft({...draft,profile:e.target.value})} placeholder="Personalidad, forma de hablar, gustos, costumbres, límites, relación contigo..."/><button className="nc-action-row" onClick={()=>{setTestIndex(0);setMode('test')}}>Hacer test básico <span>›</span></button><textarea className="nc-textarea small" value={draft.notes} onChange={e=>setDraft({...draft,notes:e.target.value})} placeholder="Notas privadas..."/></Group><Group title="Master Character Sheet">{m?<><Info label="Confianza de muestra" value={m.confidence||'Sin valorar'}/><Info label="Mensajes propios" value={String(m.evidence?.sentMessages||0)}/><Info label="Estilo observado" value={(m.communication?.styleSignals||[]).join(' · ')||'Sin datos'}/><Info label="Franja activa" value={m.communication?.activeTime||'Sin datos'}/><Info label="Vocabulario" value={(m.vocabulary||[]).map(x=>x.term).join(' · ')||'Sin datos'}/><p className="nc-profile-text">La ficha usa muestras observables. Los campos siguientes solo se completan manualmente o con información explícita.</p></>:<p className="nc-profile-text">Aún no hay ficha maestra. Añade conversación y pulsa generar.</p>}<button className="nc-action-row" disabled={!draft.conversation.trim()} onClick={regenerateMaster}>Generar / actualizar ficha maestra <span>›</span></button>{m&&<><textarea className="nc-textarea small" value={m.manual?.confirmedMemories||''} onChange={e=>updateManual('confirmedMemories',e.target.value)} placeholder="Recuerdos compartidos confirmados..."/><textarea className="nc-textarea small" value={m.manual?.goals||''} onChange={e=>updateManual('goals',e.target.value)} placeholder="Objetivos o contexto confirmado..."/><textarea className="nc-textarea small" value={m.manual?.limits||''} onChange={e=>updateManual('limits',e.target.value)} placeholder="Límites conocidos..."/><textarea className="nc-textarea small" value={m.manual?.explicitBeliefs||''} onChange={e=>updateManual('explicitBeliefs',e.target.value)} placeholder="Creencias expresadas explícitamente..."/><textarea className="nc-textarea small" value={m.manual?.privateContext||''} onChange={e=>updateManual('privateContext',e.target.value)} placeholder="Contexto privado / secretos aportados por ti..."/></>}</Group><label className="nc-consent"><input type="checkbox" checked={draft.consent} onChange={e=>setDraft({...draft,consent:e.target.checked})}/><span>Confirmo que tengo permiso para usar aquí las fotos y conversaciones que estoy aportando.</span></label>{Number(draft.age)>0&&Number(draft.age)<18&&<div className="nc-warning">PRIVATE LIFE solo permite personajes adultos de 18 años o más.</div>}<div className="nc-bottom-space"/></div></div>}
+ if(mode==='detail'&&selected){const c=contacts.find(x=>x.id===selected.id)||selected,m=c.masterSheet;return <div className="native-contacts"><NativeBar left="‹ Contactos" onLeft={()=>setMode('list')} title="" right="Editar" onRight={()=>editContact(c)}/><div className="nc-scroll nc-detail"><div className="nc-contact-hero"><Avatar contact={c} size="hero"/><h2>{c.name}</h2><p>{[c.city,c.age?c.age+' años':''].filter(Boolean).join(' · ')}</p>{!c.hideSourceType&&<span className="nc-source-badge">{c.sourceType||'Persona real'}</span>}</div><div className="nc-quick-actions"><button><i>✉</i><span>mensaje</span></button><button><i>☎</i><span>llamar</span></button><button><i>☆</i><span>favorito</span></button></div><Group><Info label="Relación" value={c.relationshipType}/>{c.relation&&<Info label="Detalle" value={c.relation}/>}<Info label="Afecto inicial" value={(Number(c.affection)||0)+'%'}/></Group>{c.profile&&<Group title="Ficha"><p className="nc-profile-text">{c.profile}</p></Group>}{m&&<Group title="Master Character Sheet"><Info label="Confianza" value={m.confidence||'Sin valorar'}/><Info label="Muestra" value={`${m.evidence?.sentMessages||0} mensajes · ${m.evidence?.threads||1} chat${Number(m.evidence?.threads||1)===1?'':'s'}`}/><Info label="Forma de escribir" value={(m.communication?.styleSignals||[]).join(' · ')||'Sin datos'}/><Info label="Franja activa" value={m.communication?.activeTime||'Sin datos'}/><Info label="Vocabulario recurrente" value={(m.vocabulary||[]).map(x=>x.term).join(' · ')||'Sin datos'}/>{(m.writingExamples||[]).length>0&&<div className="nc-info"><span>Ejemplos de escritura</span><b>{m.writingExamples.slice(0,4).map(x=>'“'+x.text+'”').join('  ·  ')}</b></div>}{(m.conversationAnchors||[]).length>0&&<div className="nc-info"><span>Anclas de conversación</span><b>{m.conversationAnchors.slice(0,3).map(x=>x.text).join('  ·  ')}</b></div>}{m.manual?.confirmedMemories&&<Info label="Recuerdos confirmados" value={m.manual.confirmedMemories}/>} {m.manual?.goals&&<Info label="Objetivos / contexto" value={m.manual.goals}/>} {m.manual?.limits&&<Info label="Límites" value={m.manual.limits}/>} {m.manual?.explicitBeliefs&&<Info label="Creencias explícitas" value={m.manual.explicitBeliefs}/>} {m.manual?.privateContext&&<Info label="Contexto privado" value={m.manual.privateContext}/>}</Group>}{c.notes&&<Group title="Notas"><p className="nc-profile-text">{c.notes}</p></Group>}<button className="nc-delete" onClick={()=>remove(c.id)}>Eliminar contacto</button><div className="nc-bottom-space"/></div></div>}
+ return <div className="native-contacts"><NativeBar left="‹" onLeft={onClose} title="Contactos" right="+" onRight={newContact}/><div className="nc-scroll nc-list-screen"><h1>Contactos</h1><div className="nc-search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar"/></div><div className="nc-owner-card"><div className="nc-owner-avatar">YO</div><div><b>Mi tarjeta</b><span>Tu perfil de Private Life</span></div></div><div className="nc-list-title">CONTACTOS</div>{!filtered.length?<div className="nc-empty"><div className="nc-empty-icon">☷</div><b>Tu agenda está vacía</b><span>Pulsa + para crear tu primer contacto.</span></div>:<div className="nc-contact-list">{filtered.map(c=><button key={c.id} className="nc-contact-row" onClick={()=>{setSelected(c);setMode('detail')}}><Avatar contact={c}/><div><b>{c.name}</b><span>{c.sourceType||'Persona real'}{c.relationshipType?' · '+c.relationshipType:''}{c.masterSheet?' · Ficha maestra':''}</span></div><em>›</em></button>)}</div>}<div className="nc-bottom-space"/></div></div>
 }
-
-function NativeBar({left,onLeft,title,right,onRight,rightDisabled=false}){
- const backOnly=left==='‹',addOnly=right==='+';
- return <div className="nc-nav">
-   <button className={'nc-nav-left '+(backOnly?'nc-nav-icon nc-nav-back':'nc-nav-text')} aria-label={backOnly?'Volver':left||'Volver'} onClick={onLeft}>{backOnly?<span aria-hidden="true">‹</span>:left}</button>
-   <b>{title}</b>
-   <button className={'nc-nav-right '+(addOnly?'nc-nav-icon nc-nav-add':'nc-nav-text')} aria-label={addOnly?'Añadir contacto':right||''} disabled={rightDisabled} onClick={onRight}>{addOnly?<span aria-hidden="true">+</span>:right}</button>
- </div>
-}
+function NativeBar({left,onLeft,title,right,onRight,rightDisabled=false}){const backOnly=left==='‹',addOnly=right==='+';return <div className="nc-nav"><button className={'nc-nav-left '+(backOnly?'nc-nav-icon nc-nav-back':'nc-nav-text')} aria-label={backOnly?'Volver':left||'Volver'} onClick={onLeft}>{backOnly?<span aria-hidden="true">‹</span>:left}</button><b>{title}</b><button className={'nc-nav-right '+(addOnly?'nc-nav-icon nc-nav-add':'nc-nav-text')} aria-label={addOnly?'Añadir contacto':right||''} disabled={rightDisabled} onClick={onRight}>{addOnly?<span aria-hidden="true">+</span>:right}</button></div>}
 function Group({title,children}){return <section className="nc-group-wrap">{title&&<div className="nc-group-title">{title}</div>}<div className="nc-group">{children}</div></section>}
 function Field({label,value,set,type='text'}){return <label className="nc-field"><span>{label}</span><input type={type} value={value} onChange={e=>set(e.target.value)}/></label>}
 function Select({label,value,set,options}){return <label className="nc-field"><span>{label}</span><select value={value} onChange={e=>set(e.target.value)}>{options.map(x=><option key={x}>{x}</option>)}</select></label>}
