@@ -99,6 +99,7 @@ export default function AdminPage(){
   const [ready,setReady]=useState(false),[users,setUsers]=useState([]),[selectedId,setSelectedId]=useState('');
   const [player,setPlayer]=useState(null),[tab,setTab]=useState('overview'),[charId,setCharId]=useState('');
   const [eventDraft,setEventDraft]=useState(''),[chatDraft,setChatDraft]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[aiHealth,setAiHealth]=useState(null),[aiHealthBusy,setAiHealthBusy]=useState(false);
+  const [aiMind,setAiMind]=useState(null),[aiMindBusy,setAiMindBusy]=useState(false),[aiMindSelectedRun,setAiMindSelectedRun]=useState('');
   const [chat,setChat]=useState([{role:'ai',text:'Director IA central conectado. Puedo analizar la partida y usar las herramientas narrativas del panel cuando me lo pidas.'}]);
 
   async function loadUsers(preferred){
@@ -136,6 +137,44 @@ export default function AdminPage(){
       setPlayer(cur=>cur&&String(cur.id)===String(id)?{...cur,...loaded}:loaded);
     }catch(e){setNotice(e.message)}
   }
+
+  async function loadAiMind(id,{quiet=false}={}){
+    if(!id)return;
+    if(!quiet)setAiMindBusy(true);
+    try{
+      const data=await api('/api/admin/ai-mind?userId='+encodeURIComponent(id),{cache:'no-store'});
+      setAiMind(data.mind||null);
+      setAiMindSelectedRun(current=>{
+        const runs=data.mind?.runs||[];
+        return current&&runs.some(r=>String(r.id)===String(current))?current:String(runs[0]?.id||'');
+      });
+    }catch(e){
+      if(!quiet)setNotice(e.message);
+    }finally{
+      if(!quiet)setAiMindBusy(false);
+    }
+  }
+
+  async function reviewAiMind(){
+    if(!player||aiMindBusy)return;
+    setAiMindBusy(true);
+    try{
+      const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+      const data=await api('/api/admin/ai-mind',{
+        method:'POST',
+        body:JSON.stringify({userId:player.id,action:'review_now',timezone})
+      });
+      setAiMind(data.mind||null);
+      setAiMindSelectedRun(String(data.mind?.runs?.[0]?.id||''));
+      await refreshPhone(player.id);
+      setNotice(data.review?.ran?'La IA central ha revisado el mundo ahora.':'Revisión solicitada.');
+      setTimeout(()=>setNotice(''),1700);
+    }catch(e){
+      setNotice(e.message);
+    }finally{
+      setAiMindBusy(false);
+    }
+  }
   useEffect(()=>{let cancelled=false;(async()=>{try{
     const me=await api('/api/auth/me',{cache:'no-store'});
     if(me.user?.role!=='admin'){window.location.replace('/');return}
@@ -143,6 +182,7 @@ export default function AdminPage(){
   }catch{window.location.replace('/')}finally{if(!cancelled)setReady(true)}})();return()=>{cancelled=true}},[]);
   useEffect(()=>{if(selectedId)loadPlayer(selectedId)},[selectedId]);
   useEffect(()=>{if(tab!=='phone'||!selectedId)return;refreshPhone(selectedId);const id=setInterval(()=>refreshPhone(selectedId),2000);return()=>clearInterval(id)},[tab,selectedId]);
+  useEffect(()=>{if(tab!=='mind'||!selectedId)return;loadAiMind(selectedId);const id=setInterval(()=>loadAiMind(selectedId,{quiet:true}),5000);return()=>clearInterval(id)},[tab,selectedId]);
 
   const save=player?.save?world(player.save):world({});
   const chars=save.world.characters,events=save.world.events;
@@ -151,6 +191,10 @@ export default function AdminPage(){
   const life=player?.life||{characters:[],events:[],context:null,worldLocation:null,timezone:'UTC',speed:1,paused:false},lifeCharacters=Array.isArray(life.characters)?life.characters:[],lifeEvents=Array.isArray(life.events)?life.events:[],playerContext=life.context||null,worldLocation=life.worldLocation||null;
   const phoneFresh=phone.updatedAt&&Date.now()-new Date(phone.updatedAt).getTime()<12000&&phoneState.visibility!=='offline';
   const installedPhoneApps=['Instagram','WhatsApp','Facebook',...(save.datingApps?.tinder?['Tinder']:[]),...(save.datingApps?.grindr?['Grindr']:[]),'Contactos','Fotos','Calendario','App Store','Ahora','Notas','Ajustes','Teléfono','Mensajes','Safari','Música'];
+  const aiRuns=Array.isArray(aiMind?.runs)?aiMind.runs:[];
+  const aiRun=aiRuns.find(r=>String(r.id)===String(aiMindSelectedRun))||aiRuns[0]||null;
+  const aiPlan=aiRun?.plan||aiMind?.state?.lastPlan||{};
+  const aiActionCount=(aiPlan.newCharacters?.length||0)+(aiPlan.characterUpdates?.length||0)+(aiPlan.relationshipUpdates?.length||0)+(aiPlan.events?.length||0)+(aiPlan.messages?.length||0);
 
   function localEdit(fn){
     if(!player)return;
@@ -307,7 +351,7 @@ export default function AdminPage(){
       <header className="admin-header"><div><small>CONSOLA DEL DIRECTOR</small><h1>{player?(save.identity?.name||'@'+player.username):'Selecciona una partida'}</h1></div><div className="admin-status"><i/> ADMIN ACTIVO</div></header>
       {notice&&<div className="admin-notice">{notice}</div>}
       {!player?<div className="admin-empty large">Selecciona un jugador para empezar.</div>:<>
-        <nav className="admin-tabs">{[['overview','Resumen'],['phone','Teléfono'],['characters','Personajes'],['events','Eventos'],['director','Director IA']].map(([k,l])=><button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>{l}</button>)}</nav>
+        <nav className="admin-tabs">{[['overview','Resumen'],['phone','Teléfono'],['mind','Mente IA'],['characters','Personajes'],['events','Eventos'],['director','Director IA']].map(([k,l])=><button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>{l}</button>)}</nav>
 
         {tab==='overview'&&<div className="admin-grid">
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>ESTADO DE PARTIDA</span><button onClick={()=>loadPlayer(player.id)}>Actualizar</button></div><div className="admin-kpis"><div><b>{chars.length}</b><span>Personajes</span></div><div><b>{events.filter(x=>x.status!=='cerrado').length}</b><span>Eventos abiertos</span></div><div><b>{Object.keys(save.profile||{}).length}</b><span>Variables</span></div></div></section>
@@ -369,6 +413,84 @@ export default function AdminPage(){
         {tab==='events'&&<div className="admin-grid">
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>NUEVO EVENTO</span></div><textarea className="admin-event-input" value={eventDraft} onChange={e=>setEventDraft(e.target.value)} placeholder="Ej.: Si pasan tres días sin hablar, Claudia toma la iniciativa."/><button className="admin-primary" disabled={!eventDraft.trim()||busy} onClick={()=>addEvent()}>Programar evento</button></section>
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>COLA NARRATIVA</span></div><div className="admin-event-list">{events.map(ev=><div key={ev.id} className="admin-event"><div><b>{ev.description}</b><small>{fmt(ev.createdAt)} · {ev.trigger||'manual'}</small></div><select value={ev.status||'pendiente'} onChange={e=>localEdit(next=>{next.world.events=next.world.events.map(x=>x.id===ev.id?{...x,status:e.target.value}:x)})}><option value="pendiente">Pendiente</option><option value="activo">Activo</option><option value="cerrado">Cerrado</option></select></div>)}{!events.length&&<div className="admin-empty">No hay eventos programados.</div>}</div><button className="admin-primary secondary" disabled={busy} onClick={()=>persist(save,'Estados de eventos actualizados')}>Guardar estados</button></section>
+        </div>}
+
+        {tab==='mind'&&<div className="admin-ai-mind">
+          <section className="admin-card admin-ai-mind-hero">
+            <div className="admin-card-head"><span>IA CENTRAL · WORLD DIRECTOR</span><button disabled={aiMindBusy} onClick={reviewAiMind}>{aiMindBusy?'REVISANDO…':'REVISAR MUNDO AHORA'}</button></div>
+            <div className="admin-ai-mind-status">
+              <div><span>ESTADO</span><b>{aiMind?.state?'AUTÓNOMA / ACTIVA':'SIN CICLO TODAVÍA'}</b></div>
+              <div><span>CICLOS</span><b>{aiMind?.state?.runCount||0}</b></div>
+              <div><span>ÚLTIMA REVISIÓN</span><b>{fmt(aiMind?.state?.lastRunGameAt)}</b></div>
+              <div><span>PRÓXIMA REVISIÓN</span><b>{fmt(aiMind?.state?.nextRunGameAt)}</b></div>
+            </div>
+            <div className="admin-ai-summary">
+              <small>CRITERIO RESUMIDO ACTUAL</small>
+              <p>{aiRun?.summary||aiMind?.state?.lastSummary||'La IA todavía no ha realizado una revisión autónoma de esta partida.'}</p>
+            </div>
+          </section>
+
+          <section className="admin-ai-mind-grid">
+            <div className="admin-card">
+              <div className="admin-card-head"><span>QUÉ ESTÁ VIENDO</span></div>
+              <dl className="admin-dl">
+                <div><dt>Zona</dt><dd>{aiRun?.context?.player?.worldLocation?.display_label||worldLocation?.display_label||'—'}</dd></div>
+                <div><dt>Lugar</dt><dd>{aiRun?.context?.player?.currentContext?.locationLabel||playerContext?.location_label||'—'}</dd></div>
+                <div><dt>Actividad</dt><dd>{aiRun?.context?.player?.currentContext?.activityLabel||playerContext?.activity_label||'—'}</dd></div>
+                <div><dt>Contactos</dt><dd>{aiRun?.context?.counts?.contacts??'—'}</dd></div>
+                <div><dt>Personajes mundo</dt><dd>{aiRun?.context?.counts?.worldCharacters??chars.length}</dd></div>
+                <div><dt>Eventos abiertos</dt><dd>{aiRun?.context?.counts?.openEvents??events.filter(x=>x.status!=='cerrado').length}</dd></div>
+              </dl>
+            </div>
+
+            <div className="admin-card">
+              <div className="admin-card-head"><span>LECTURA DE LA IA</span></div>
+              <div className="admin-ai-observations">
+                {(aiRun?.observations||aiMind?.state?.lastPlan?.observations||[]).map((x,i)=><div key={i}><i>{i+1}</i><p>{String(x)}</p></div>)}
+                {!((aiRun?.observations||aiMind?.state?.lastPlan?.observations||[]).length)&&<div className="admin-empty">Sin observaciones registradas.</div>}
+              </div>
+            </div>
+
+            <div className="admin-card">
+              <div className="admin-card-head"><span>CRITERIOS / MOTIVOS</span></div>
+              <div className="admin-ai-observations notes">
+                {(aiRun?.directorNotes||aiMind?.state?.lastPlan?.directorNotes||[]).map((x,i)=><div key={i}><i>•</i><p>{String(x)}</p></div>)}
+                {!((aiRun?.directorNotes||aiMind?.state?.lastPlan?.directorNotes||[]).length)&&<div className="admin-empty">Sin notas operativas en este ciclo.</div>}
+              </div>
+            </div>
+
+            <div className="admin-card">
+              <div className="admin-card-head"><span>RESULTADO DEL CICLO</span></div>
+              <div className="admin-ai-action-kpis">
+                <div><b>{aiPlan.newCharacters?.length||0}</b><span>Nuevos personajes</span></div>
+                <div><b>{aiPlan.events?.length||0}</b><span>Eventos</span></div>
+                <div><b>{aiPlan.messages?.length||0}</b><span>Mensajes</span></div>
+                <div><b>{aiActionCount}</b><span>Acciones totales</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section className="admin-card admin-ai-actions">
+            <div className="admin-card-head"><span>ACCIONES DECIDIDAS / EJECUTADAS</span><small>{aiRun?fmt(aiRun.gameAt):'—'}</small></div>
+            <div className="admin-ai-action-list">
+              {(aiPlan.newCharacters||[]).map((x,i)=><article key={'nc'+i}><span className="kind">PERSONAJE</span><div><b>{x.name||'Nuevo personaje'}</b><p>{x.role||x.occupation||'Creación procedural por World Director'}</p></div></article>)}
+              {(aiPlan.characterUpdates||[]).map((x,i)=><article key={'cu'+i}><span className="kind">CAMBIO</span><div><b>{x.name||x.id||'Personaje'}</b><p>{Object.keys(x.patch||{}).join(', ')||'Actualización de ficha'}</p></div></article>)}
+              {(aiPlan.relationshipUpdates||[]).map((x,i)=><article key={'ru'+i}><span className="kind">RELACIÓN</span><div><b>{x.name||x.id||'Personaje'}</b><p>{Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · ')||'Sin cambios'}</p></div></article>)}
+              {(aiPlan.events||[]).map((x,i)=><article key={'ev'+i}><span className="kind">EVENTO</span><div><b>{x.title||x.type||'Evento'}</b><p>{x.reason||x.body||''}{x.delayMinutes!=null?' · en '+x.delayMinutes+' min':''}</p></div></article>)}
+              {(aiPlan.messages||[]).map((x,i)=><article key={'msg'+i}><span className="kind">MENSAJE</span><div><b>{x.contactName||'Contacto'}</b><p>{x.reason||x.text||''}{x.delayMinutes!=null?' · en '+x.delayMinutes+' min':''}</p></div></article>)}
+              {!aiActionCount&&<div className="admin-empty">La IA decidió no ejecutar ninguna acción en este ciclo. El silencio también es una decisión del motor.</div>}
+            </div>
+          </section>
+
+          <section className="admin-card admin-ai-history">
+            <div className="admin-card-head"><span>HISTORIAL DE CICLOS</span><button onClick={()=>loadAiMind(player.id)} disabled={aiMindBusy}>Actualizar</button></div>
+            <div className="admin-ai-run-list">
+              {aiRuns.map(run=><button key={run.id} className={String(aiRun?.id)===String(run.id)?'active':''} onClick={()=>setAiMindSelectedRun(String(run.id))}><span><b>{fmt(run.gameAt)}</b><small>{run.queuedEvents} eventos · {run.queuedMessages} mensajes</small></span><p>{run.summary||'Sin resumen'}</p></button>)}
+              {!aiRuns.length&&<div className="admin-empty">Todavía no hay ciclos autónomos guardados.</div>}
+            </div>
+          </section>
+
+          <div className="admin-ai-disclaimer">Este panel muestra resúmenes auditables, observaciones y decisiones estructuradas del World Director. No expone razonamiento interno paso a paso del modelo.</div>
         </div>}
 
         {tab==='director'&&<section className="admin-card admin-director"><div className="admin-card-head"><span>DIRECTOR IA · @{player.username}</span><button onClick={testCentralAI} disabled={aiHealthBusy}>{aiHealthBusy?'Probando…':'Probar IA central'}</button></div>{aiHealth&&<div className={'admin-ai-health '+(aiHealth.ok?'ok':'bad')}><b>{aiHealth.ok?'IA CENTRAL CONECTADA':'IA CENTRAL CON PROBLEMAS'}</b><span>Proveedor: {aiHealth.provider?aiHealth.provider.toUpperCase():'—'} · Clave: {aiHealth.configured?'detectada':'no detectada'} · Red: {aiHealth.reachable?'OK':'fallo'} · Modelo: {aiHealth.model||'—'}{aiHealth.latencyMs!=null?' · '+aiHealth.latencyMs+' ms':''}</span>{aiHealth.message&&<p>{aiHealth.message}</p>}</div>}<div className="admin-chat">{chat.map((m,i)=><div key={i} className={'admin-message '+m.role}><b>{m.role==='ai'?'DIRECTOR AI':'ADMIN'}</b><p>{m.text}</p></div>)}</div><form className="admin-chat-form" onSubmit={sendDirector}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} placeholder="Habla con el Director: resume la partida, crea o modifica personajes, ajusta variables, programa eventos o WhatsApps, analiza el teléfono..."/><button disabled={!chatDraft.trim()||busy}>Enviar</button></form></section>}
