@@ -173,8 +173,8 @@ function PhoneHome({identity,datingApps,authUser,logout}){
          <PhoneApp src="/phone/instagram.webp" name="Instagram" onOpen={()=>setOpened('Instagram')}/>
          {datingApps.tinder&&<PhoneApp src="/phone/tinder.webp" name="Tinder" onOpen={()=>setOpened('Tinder')}/>}
          {datingApps.grindr&&<PhoneApp src="/phone/grindr.webp" name="Grindr" onOpen={()=>setOpened('Grindr')}/>}
-         <PhoneApp src="/phone/contacts.webp" name="Contactos" onOpen={()=>setOpened('Contactos')}/>
-         <PhoneApp src="/phone/photos.webp" name="Fotos" onOpen={()=>setOpened('Fotos')}/>
+         <PhoneApp src="/phone/contacts.webp" name="Contactos" onOpen={()=>{window.location.href='/contactos'}}/>
+         <PhoneApp src="/phone/photos.webp" name="Fotos" onOpen={()=>{if(typeof window!=='undefined'&&typeof window.__plOpenGallery==='function')window.__plOpenGallery();else setOpened('Fotos')}}/>
          <PhoneApp src="/phone/calendar.webp" name="Calendario" onOpen={()=>setOpened('Calendario')}/>
        </div></section>
        <section className="home-page second-page">
