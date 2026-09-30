@@ -500,3 +500,14 @@
 .plai-modal{position:absolute;inset:0;z-index:50;background:#0008;display:grid;place-items:center;padding:22px}.plai-modal>div{width:100%;background:#fff;border-radius:18px;padding:17px}.plai-modal h3{margin:0 0 6px;font-size:16px}.plai-modal p{margin:0 0 14px;color:#71737a;font-size:10px;line-height:1.4}.plai-modal>div>div{display:grid;grid-template-columns:1fr 1fr;gap:7px}.plai-modal button{border:0;border-radius:10px;padding:9px;font-size:10px;font-weight:800}
 .plai-toast{position:absolute;z-index:70;left:50%;bottom:20px;transform:translateX(-50%);max-width:84%;background:#111;color:#fff;border-radius:18px;padding:8px 11px;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 4px 14px #0004}
 @media(max-width:380px){.plai-form-grid{grid-template-columns:1fr}.plai-field.wide{grid-column:auto}.plai-list-intro h1{font-size:25px}.plai-character-hero{padding:10px}.plai-avatar{width:58px;height:58px}}
+
+
+/* Director · central AI health */
+.admin-ai-health{margin:10px 0 14px;border:1px solid #293241;border-radius:10px;padding:10px 12px;background:#0e141c;display:flex;flex-direction:column;gap:4px}
+.admin-ai-health b{font-size:10px;letter-spacing:.06em}
+.admin-ai-health span{font-size:9px;color:#aeb8c8}
+.admin-ai-health p{margin:2px 0 0;font-size:9px;line-height:1.4;color:#8f99a9}
+.admin-ai-health.ok{border-color:#1d694f;background:#0c1e18}
+.admin-ai-health.ok b{color:#55d6a3}
+.admin-ai-health.bad{border-color:#663232;background:#211010}
+.admin-ai-health.bad b{color:#ff8585}
