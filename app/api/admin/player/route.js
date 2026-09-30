@@ -106,6 +106,14 @@ export async function GET(request) {
             id:String(e.id),key:e.event_key,type:e.event_type,app:e.app,title:e.title,body:e.body,
             payload:e.payload||{},scheduledGameAt:e.scheduled_game_at,status:e.status,createdAt:e.created_at,deliveredAt:e.delivered_at
           })),
+          autonomy:autonomyStateResult.rows.map(x=>({
+            characterKey:x.character_key,nextActionGameAt:x.next_action_game_at,lastActionGameAt:x.last_action_game_at,
+            dailyKey:x.daily_key,dailyCount:Number(x.daily_count)||0,state:x.state_data||{},updatedAt:x.updated_at
+          })),
+          autonomyEvents:autonomyEventsResult.rows.map(x=>({
+            id:String(x.id),characterKey:x.character_key,characterName:x.character_name,type:x.event_type,
+            data:x.event_data||{},gameAt:x.game_at,createdAt:x.created_at
+          })),
           characters:lifeCharacters,
         },
       },
