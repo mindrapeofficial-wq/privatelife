@@ -190,13 +190,13 @@ export default function AdminPage(){
   const chars=save.world.characters,events=save.world.events;
   const character=useMemo(()=>chars.find(x=>x.id===charId)||chars[0]||null,[chars,charId]);
   const phone=player?.phone||{state:{},activity:[],whatsapp:[],updatedAt:null},phoneState=phone.state||{},phoneActivity=Array.isArray(phone.activity)?phone.activity:[],phoneWhatsapp=Array.isArray(phone.whatsapp)?phone.whatsapp:[];
-  const life=player?.life||{characters:[],events:[],autonomy:[],autonomyEvents:[],memories:[],intentions:[],context:null,worldLocation:null,timezone:'UTC',speed:1,paused:false},lifeCharacters=Array.isArray(life.characters)?life.characters:[],lifeEvents=Array.isArray(life.events)?life.events:[],lifeAutonomy=Array.isArray(life.autonomy)?life.autonomy:[],lifeAutonomyEvents=Array.isArray(life.autonomyEvents)?life.autonomyEvents:[],lifeMemories=Array.isArray(life.memories)?life.memories:[],lifeIntentions=Array.isArray(life.intentions)?life.intentions:[],playerContext=life.context||null,worldLocation=life.worldLocation||null;
+  const life=player?.life||{characters:[],events:[],autonomy:[],autonomyEvents:[],memories:[],intentions:[],socialGraph:{edges:[],recentEvents:[],information:[],analytics:{}},context:null,worldLocation:null,timezone:'UTC',speed:1,paused:false},lifeCharacters=Array.isArray(life.characters)?life.characters:[],lifeEvents=Array.isArray(life.events)?life.events:[],lifeAutonomy=Array.isArray(life.autonomy)?life.autonomy:[],lifeAutonomyEvents=Array.isArray(life.autonomyEvents)?life.autonomyEvents:[],lifeMemories=Array.isArray(life.memories)?life.memories:[],lifeIntentions=Array.isArray(life.intentions)?life.intentions:[],socialGraph=life.socialGraph||{edges:[],recentEvents:[],information:[],analytics:{}},socialEdges=Array.isArray(socialGraph.edges)?socialGraph.edges:[],socialEvents=Array.isArray(socialGraph.recentEvents)?socialGraph.recentEvents:[],socialInformation=Array.isArray(socialGraph.information)?socialGraph.information:[],playerContext=life.context||null,worldLocation=life.worldLocation||null;
   const phoneFresh=phone.updatedAt&&Date.now()-new Date(phone.updatedAt).getTime()<12000&&phoneState.visibility!=='offline';
   const installedPhoneApps=['Instagram','WhatsApp','Facebook',...(save.datingApps?.tinder?['Tinder']:[]),...(save.datingApps?.grindr?['Grindr']:[]),'Contactos','Fotos','Calendario','App Store','Ahora','Notas','Ajustes','Teléfono','Mensajes','Safari','Música'];
   const aiRuns=Array.isArray(aiMind?.runs)?aiMind.runs:[];
   const aiRun=aiRuns.find(r=>String(r.id)===String(aiMindSelectedRun))||aiRuns[0]||null;
   const aiPlan=aiRun?.plan||aiMind?.state?.lastPlan||{};
-  const aiActionCount=(aiPlan.newCharacters?.length||0)+(aiPlan.characterUpdates?.length||0)+(aiPlan.relationshipUpdates?.length||0)+(aiPlan.events?.length||0)+(aiPlan.messages?.length||0);
+  const aiActionCount=(aiPlan.newCharacters?.length||0)+(aiPlan.characterUpdates?.length||0)+(aiPlan.relationshipUpdates?.length||0)+(aiPlan.socialActions?.length||0)+(aiPlan.informationActions?.length||0)+(aiPlan.events?.length||0)+(aiPlan.messages?.length||0);
   const consoleEntries=useMemo(()=>{
     const out=[];
     const push=(entry)=>{if(entry?.at)out.push({...entry,at:entry.at})};
@@ -241,6 +241,20 @@ export default function AdminPage(){
       title:'Un personaje mantiene una intención '+String(intent.status||'pending'),
       text:String(intent.summary||'Intención narrativa sin descripción.'),
       meta:String(intent.characterKey||'NPC')+' · prioridad '+String(intent.priority??'—')
+    }));
+
+    socialEvents.forEach(ev=>push({
+      id:'social:'+ev.id,kind:'world',source:'SOCIEDAD NPC',at:ev.gameAt||ev.createdAt,
+      title:String(ev.type||'interacción').replaceAll('_',' ')+' · '+String(ev.actorKey||'NPC')+' ↔ '+String(ev.targetKey||'NPC'),
+      text:String(ev.summary||'Interacción social entre personajes.'),
+      meta:ev.visibility==='player_relevant'?'POTENCIALMENTE RELEVANTE PARA EL JUGADOR':'RED SOCIAL NPC'
+    }));
+
+    socialInformation.filter(info=>(info.holderCount||0)>=2||String(info.subjectKey||'').startsWith('player')).forEach(info=>push({
+      id:'social-info:'+info.id,kind:'ai',source:'INFORMACIÓN SOCIAL',at:info.createdGameAt,
+      title:(info.holderCount||0)+' personajes conocen una información',
+      text:String(info.content||'Información sin contenido.'),
+      meta:'sensibilidad '+String(info.sensitivity??'—')+' · importancia '+String(info.importance??'—')+' · '+String(info.truthStatus||'unknown')
     }));
 
     if(playerContext?.updated_at)push({
@@ -301,6 +315,16 @@ export default function AdminPage(){
         title:'La IA reajustó una relación',
         text:(x.name||x.id||'Personaje')+' · '+(Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · ')||'sin variaciones numéricas')
       }));
+      (plan.socialActions||[]).forEach((x,i)=>push({
+        id:'ai-social:'+run.id+':'+i,kind:'ai',source:'IA · SOCIAL',at:run.createdAt||run.gameAt,
+        title:'La IA actuó sobre la red NPC',
+        text:[x.actorKey&&x.targetKey?(x.actorKey+' ↔ '+x.targetKey):null,x.summary||x.type,Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · ')].filter(Boolean).join(' · ')
+      }));
+      (plan.informationActions||[]).forEach((x,i)=>push({
+        id:'ai-info:'+run.id+':'+i,kind:'ai',source:'IA · INFORMACIÓN',at:run.createdAt||run.gameAt,
+        title:x.action==='share'?'La IA permitió circular información':'La IA registró información social',
+        text:[x.infoKey,x.content||x.summary||x.reason,x.fromKey&&x.toKey?(x.fromKey+' → '+x.toKey):null].filter(Boolean).join(' · ')
+      }));
       (plan.events||[]).forEach((x,i)=>push({
         id:'ai-event:'+run.id+':'+i,kind:'ai',source:'IA · PLAN',at:run.createdAt||run.gameAt,
         title:'La IA programó un evento',
@@ -314,7 +338,7 @@ export default function AdminPage(){
     });
 
     return out.sort((a,b)=>new Date(b.at).getTime()-new Date(a.at).getTime()).slice(0,900);
-  },[phoneActivity,phoneWhatsapp,lifeEvents,lifeAutonomyEvents,lifeMemories,lifeIntentions,playerContext,worldLocation,events,save.world?.directorLog,save.identity?.name,aiRuns]);
+  },[phoneActivity,phoneWhatsapp,lifeEvents,lifeAutonomyEvents,lifeMemories,lifeIntentions,socialEvents,socialInformation,playerContext,worldLocation,events,save.world?.directorLog,save.identity?.name,aiRuns]);
   const visibleConsoleEntries=useMemo(()=>{
     const q=consoleQuery.trim().toLowerCase();
     return consoleEntries.filter(x=>(consoleFilter==='all'||x.kind===consoleFilter)&&(!q||[x.source,x.title,x.text,x.meta].some(v=>String(v||'').toLowerCase().includes(q))));
@@ -577,6 +601,17 @@ export default function AdminPage(){
                 <div className="admin-event-list">{lifeIntentions.filter(x=>x.characterKey===('world:'+String(character.id))&&['pending','active'].includes(x.status)).slice(0,8).map(i=><div className="admin-event" key={'intent-'+i.id}><div><b>{i.type} · prioridad {i.priority}</b><p>{i.summary}</p><small>{i.status}{i.notBeforeGameAt?' · desde '+fmt(i.notBeforeGameAt):''}</small></div></div>)}{!lifeIntentions.some(x=>x.characterKey===('world:'+String(character.id))&&['pending','active'].includes(x.status))&&<div className="admin-empty">No hay intenciones pendientes.</div>}</div>
               </div>
             </div>
+            <div className="admin-card-head sub"><span>RED SOCIAL NPC</span></div>
+            <div className="admin-grid">
+              <div className="admin-card">
+                <div className="admin-card-head"><span>VÍNCULOS</span></div>
+                <div className="admin-event-list">{socialEdges.filter(e=>[e.aKey,e.bKey].includes('world:'+String(character.id))).slice(0,10).map(e=>{const me='world:'+String(character.id),other=e.aKey===me?e.bKey:e.aKey,otherName=chars.find(c=>'world:'+String(c.id)===other)?.name||other;return <div className="admin-event" key={'edge-'+e.aKey+'-'+e.bKey}><div><b>{otherName} · {e.relationLabel}</b><p>afinidad {e.affinity} · confianza {e.trust} · tensión {e.tension} · familiaridad {e.familiarity}</p><small>{e.interactionCount||0} interacciones · {fmt(e.lastInteractionGameAt)}</small></div></div>})}{!socialEdges.some(e=>[e.aKey,e.bKey].includes('world:'+String(character.id)))&&<div className="admin-empty">Todavía no tiene vínculos NPC↔NPC registrados.</div>}</div>
+              </div>
+              <div className="admin-card">
+                <div className="admin-card-head"><span>ACTIVIDAD SOCIAL RECIENTE</span></div>
+                <div className="admin-event-list">{socialEvents.filter(e=>[e.actorKey,e.targetKey].includes('world:'+String(character.id))).slice(0,8).map(e=><div className="admin-event" key={'social-event-'+e.id}><div><b>{String(e.type||'interacción').replaceAll('_',' ')}</b><p>{e.summary}</p><small>{fmt(e.gameAt)} · {e.visibility}</small></div></div>)}{!socialEvents.some(e=>[e.actorKey,e.targetKey].includes('world:'+String(character.id)))&&<div className="admin-empty">Sin actividad social reciente.</div>}</div>
+              </div>
+            </div>
             {[['appearance','Apariencia real / referencia visual'],['personality','Personalidad'],['communication','Forma de comunicarse'],['objectives','Objetivos'],['boundaries','Límites'],['secrets','Secretos'],['notes','Notas privadas del Director']].map(([k,l])=><label className="admin-textarea" key={k}>{l}<textarea value={character[k]||''} onChange={e=>patchCharacter({[k]:e.target.value})}/></label>)}
             <div className="admin-card-head sub"><span>PARÁMETROS</span></div><div className="admin-traits">{TRAITS.map(t=><label key={t}><span>{t}</span><input type="range" min="0" max="100" value={character.traits?.[t]??50} onChange={e=>patchTrait(t,e.target.value)}/><b>{character.traits?.[t]??50}</b></label>)}</div>
           </>}</section>
@@ -612,7 +647,20 @@ export default function AdminPage(){
                 <div><dt>Contactos</dt><dd>{aiRun?.context?.counts?.contacts??'—'}</dd></div>
                 <div><dt>Personajes mundo</dt><dd>{aiRun?.context?.counts?.worldCharacters??chars.length}</dd></div>
                 <div><dt>Eventos abiertos</dt><dd>{aiRun?.context?.counts?.openEvents??events.filter(x=>x.status!=='cerrado').length}</dd></div>
+                <div><dt>Vínculos NPC↔NPC</dt><dd>{aiRun?.context?.counts?.socialEdges??socialEdges.length}</dd></div>
+                <div><dt>Eventos sociales</dt><dd>{aiRun?.context?.counts?.recentSocialEvents??socialEvents.length}</dd></div>
+                <div><dt>Información activa</dt><dd>{aiRun?.context?.counts?.activeInformation??socialInformation.length}</dd></div>
               </dl>
+            </div>
+
+            <div className="admin-card">
+              <div className="admin-card-head"><span>SEÑALES SOCIALES ANALIZADAS</span></div>
+              <div className="admin-ai-observations">
+                {(aiRun?.context?.socialAnalysis?.activeTensions||socialGraph?.analytics?.activeTensions||[]).slice(0,3).map((x,i)=><div key={'t'+i}><i>!</i><p>Tensión: {x.aKey} ↔ {x.bKey} · {x.tension}</p></div>)}
+                {(aiRun?.context?.socialAnalysis?.socialHubs||socialGraph?.analytics?.socialHubs||[]).slice(0,3).map((x,i)=><div key={'h'+i}><i>•</i><p>Hub social: {x.characterKey} · {x.connections} conexiones</p></div>)}
+                {(aiRun?.context?.socialAnalysis?.spreadingInformation||socialGraph?.analytics?.spreadingInformation||[]).slice(0,3).map((x,i)=><div key={'i'+i}><i>↗</i><p>Información circulando: {x.content} · {x.holderCount} personas</p></div>)}
+                {!((aiRun?.context?.socialAnalysis?.activeTensions||socialGraph?.analytics?.activeTensions||[]).length||(aiRun?.context?.socialAnalysis?.socialHubs||socialGraph?.analytics?.socialHubs||[]).length||(aiRun?.context?.socialAnalysis?.spreadingInformation||socialGraph?.analytics?.spreadingInformation||[]).length)&&<div className="admin-empty">Todavía no hay señales sociales suficientes para destacar patrones.</div>}
+              </div>
             </div>
 
             <div className="admin-card">
@@ -637,6 +685,8 @@ export default function AdminPage(){
                 <div><b>{aiPlan.newCharacters?.length||0}</b><span>Nuevos personajes</span></div>
                 <div><b>{aiPlan.events?.length||0}</b><span>Eventos</span></div>
                 <div><b>{aiPlan.messages?.length||0}</b><span>Mensajes</span></div>
+                <div><b>{aiPlan.socialActions?.length||0}</b><span>Acciones sociales</span></div>
+                <div><b>{aiPlan.informationActions?.length||0}</b><span>Movimientos info</span></div>
                 <div><b>{aiActionCount}</b><span>Acciones totales</span></div>
               </div>
             </div>
@@ -648,6 +698,8 @@ export default function AdminPage(){
               {(aiPlan.newCharacters||[]).map((x,i)=><article key={'nc'+i}><span className="kind">PERSONAJE</span><div><b>{x.name||'Nuevo personaje'}</b><p>{x.role||x.occupation||'Creación procedural por World Director'}</p></div></article>)}
               {(aiPlan.characterUpdates||[]).map((x,i)=><article key={'cu'+i}><span className="kind">CAMBIO</span><div><b>{x.name||x.id||'Personaje'}</b><p>{Object.keys(x.patch||{}).join(', ')||'Actualización de ficha'}</p></div></article>)}
               {(aiPlan.relationshipUpdates||[]).map((x,i)=><article key={'ru'+i}><span className="kind">RELACIÓN</span><div><b>{x.name||x.id||'Personaje'}</b><p>{Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · ')||'Sin cambios'}</p></div></article>)}
+              {(aiPlan.socialActions||[]).map((x,i)=><article key={'sa'+i}><span className="kind">SOCIAL</span><div><b>{x.actorKey||'NPC'} ↔ {x.targetKey||'NPC'}</b><p>{x.summary||x.type||'Interacción social'}{Object.keys(x.deltas||{}).length?' · '+Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · '):''}</p></div></article>)}
+              {(aiPlan.informationActions||[]).map((x,i)=><article key={'ia'+i}><span className="kind">INFO</span><div><b>{x.action==='share'?'Difusión':'Nueva información'} · {x.infoKey||'sin clave'}</b><p>{x.content||x.summary||x.reason||[x.fromKey,x.toKey].filter(Boolean).join(' → ')||'Movimiento de información social'}</p></div></article>)}
               {(aiPlan.events||[]).map((x,i)=><article key={'ev'+i}><span className="kind">EVENTO</span><div><b>{x.title||x.type||'Evento'}</b><p>{x.reason||x.body||''}{x.delayMinutes!=null?' · en '+x.delayMinutes+' min':''}</p></div></article>)}
               {(aiPlan.messages||[]).map((x,i)=><article key={'msg'+i}><span className="kind">MENSAJE</span><div><b>{x.contactName||'Contacto'}</b><p>{x.reason||x.text||''}{x.delayMinutes!=null?' · en '+x.delayMinutes+' min':''}</p></div></article>)}
               {!aiActionCount&&<div className="admin-empty">La IA decidió no ejecutar ninguna acción en este ciclo. El silencio también es una decisión del motor.</div>}
@@ -657,7 +709,7 @@ export default function AdminPage(){
           <section className="admin-card admin-ai-history">
             <div className="admin-card-head"><span>HISTORIAL DE CICLOS</span><button onClick={()=>loadAiMind(player.id)} disabled={aiMindBusy}>Actualizar</button></div>
             <div className="admin-ai-run-list">
-              {aiRuns.map(run=><button key={run.id} className={String(aiRun?.id)===String(run.id)?'active':''} onClick={()=>setAiMindSelectedRun(String(run.id))}><span><b>{fmt(run.gameAt)}</b><small>{run.queuedEvents} eventos · {run.queuedMessages} mensajes</small></span><p>{run.summary||'Sin resumen'}</p></button>)}
+              {aiRuns.map(run=><button key={run.id} className={String(aiRun?.id)===String(run.id)?'active':''} onClick={()=>setAiMindSelectedRun(String(run.id))}><span><b>{fmt(run.gameAt)}</b><small>{run.queuedEvents} eventos · {run.queuedMessages} mensajes · {(run.plan?.socialActions?.length||0)} sociales</small></span><p>{run.summary||'Sin resumen'}</p></button>)}
               {!aiRuns.length&&<div className="admin-empty">Todavía no hay ciclos autónomos guardados.</div>}
             </div>
           </section>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isCurrentAdmin } from '../../../../lib/auth.js';
 import { ensureSchema, query } from '../../../../lib/db.js';
 import { resolveRoutineState } from '../../../../lib/life-routines.js';
+import { loadSocialAnalysis } from '../../../../lib/life-social.js';
 
 export const runtime = 'nodejs';
 
@@ -49,14 +50,15 @@ export async function GET(request) {
       END AS game_now
       FROM private_life.world_clock WHERE user_id=$1 LIMIT 1`,[userId]);
     const clock=clockResult.rows[0]||{speed:1,paused:false,timezone:'UTC',game_now:new Date()};
-    const [playerContextResult,lifeEventsResult,playerLocationResult,autonomyStateResult,autonomyEventsResult,npcMemoriesResult,npcIntentionsResult]=await Promise.all([
+    const [playerContextResult,lifeEventsResult,playerLocationResult,autonomyStateResult,autonomyEventsResult,npcMemoriesResult,npcIntentionsResult,socialGraph]=await Promise.all([
       query('SELECT location_key,location_label,activity_key,activity_label,availability,social_exposure,privacy,started_game_at,expected_until_game_at,revision,last_evaluated_game_at,next_evaluation_game_at,updated_at FROM private_life.player_context WHERE user_id=$1 LIMIT 1',[userId]),
       query("SELECT id,event_key,event_type,app,title,body,payload,scheduled_game_at,status,created_at,delivered_at FROM private_life.life_events WHERE user_id=$1 ORDER BY created_at DESC LIMIT 80",[userId]),
       query('SELECT source,display_label,area,city,region,country,country_code,latitude,longitude,accuracy_m,timezone,updated_at FROM private_life.player_location WHERE user_id=$1 LIMIT 1',[userId]),
       query("SELECT character_key,next_action_game_at,last_action_game_at,daily_key,daily_count,state_data,updated_at FROM private_life.npc_autonomy_state WHERE user_id=$1 ORDER BY next_action_game_at ASC LIMIT 200",[userId]),
       query("SELECT id,character_key,character_name,event_type,event_data,game_at,created_at FROM private_life.npc_autonomy_events WHERE user_id=$1 ORDER BY game_at DESC,id DESC LIMIT 120",[userId]),
       query("SELECT id,character_key,memory_type,summary,importance,emotional_valence,occurred_game_at,last_recalled_game_at,recall_count,status,metadata FROM private_life.npc_memories WHERE user_id=$1 ORDER BY importance DESC,occurred_game_at DESC LIMIT 300",[userId]),
-      query("SELECT id,character_key,intention_type,summary,priority,status,not_before_game_at,due_game_at,trigger_data,created_game_at,resolved_game_at,resolution_note,metadata FROM private_life.npc_intentions WHERE user_id=$1 ORDER BY created_game_at DESC LIMIT 300",[userId])
+      query("SELECT id,character_key,intention_type,summary,priority,status,not_before_game_at,due_game_at,trigger_data,created_game_at,resolved_game_at,resolution_note,metadata FROM private_life.npc_intentions WHERE user_id=$1 ORDER BY created_game_at DESC LIMIT 300",[userId]),
+      loadSocialAnalysis(userId,{limitEvents:120})
     ]);
     const save=row.save_data||{};
     const lifeCharacters=(Array.isArray(save?.world?.characters)?save.world.characters:[]).map(character=>({
@@ -130,6 +132,7 @@ export async function GET(request) {
             dueGameAt:x.due_game_at,triggerData:x.trigger_data||{},createdGameAt:x.created_game_at,
             resolvedGameAt:x.resolved_game_at,resolutionNote:x.resolution_note||'',metadata:x.metadata||{}
           })),
+          socialGraph,
           characters:lifeCharacters,
         },
       },
