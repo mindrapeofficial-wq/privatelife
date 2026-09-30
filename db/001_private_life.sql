@@ -136,3 +136,39 @@ CREATE TABLE IF NOT EXISTS private_life.facebook_messages (
 
 CREATE INDEX IF NOT EXISTS private_life_fb_messages_pair_created_idx
   ON private_life.facebook_messages(sender_id, recipient_id, created_at DESC);
+
+
+CREATE TABLE IF NOT EXISTS private_life.ai_characters (
+  id BIGSERIAL PRIMARY KEY,
+  owner_user_id BIGINT NOT NULL REFERENCES private_life.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  age INTEGER NOT NULL CHECK (age >= 18 AND age <= 120),
+  public_handle TEXT,
+  avatar TEXT NOT NULL DEFAULT '',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','contacts','public')),
+  allow_player_interactions BOOLEAN NOT NULL DEFAULT FALSE,
+  config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS private_life_ai_characters_owner_updated_idx
+  ON private_life.ai_characters(owner_user_id, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS private_life_ai_characters_public_idx
+  ON private_life.ai_characters(visibility, is_active)
+  WHERE visibility <> 'private';
+
+CREATE TABLE IF NOT EXISTS private_life.ai_character_player_state (
+  character_id BIGINT NOT NULL REFERENCES private_life.ai_characters(id) ON DELETE CASCADE,
+  player_user_id BIGINT NOT NULL REFERENCES private_life.users(id) ON DELETE CASCADE,
+  relationship_state JSONB NOT NULL DEFAULT '{}'::jsonb,
+  memory_state JSONB NOT NULL DEFAULT '{}'::jsonb,
+  last_interaction_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY(character_id, player_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS private_life_ai_character_player_state_player_idx
+  ON private_life.ai_character_player_state(player_user_id, updated_at DESC);
