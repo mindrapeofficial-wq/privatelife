@@ -27,10 +27,11 @@ const ACTIVITIES={
   other:[['custom','Otra actividad'],['free','Disponible'],['friends','Con amigos']]
 };
 const DURATIONS=[[0,'Sin hora'],[30,'30 min'],[60,'1 h'],[120,'2 h'],[240,'4 h']];
+const OPEN_INTENT_KEY='private-life-open-intent-v1';
 
 function timezone(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch{return'UTC'}}
 
-export default function NowApp({onClose}){
+export default function NowApp({onClose,onOpenApp}){
   const [context,setContext]=useState(null);
   const [worldLocation,setWorldLocation]=useState(null);
   const [editingWorldLocation,setEditingWorldLocation]=useState(false);
@@ -42,7 +43,90 @@ export default function NowApp({onClose}){
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
+  const [lifeEvent,setLifeEvent]=useState(null);
+  const [eventBusy,setEventBusy]=useState(false);
+  const [eventResult,setEventResult]=useState('');
   const activities=useMemo(()=>ACTIVITIES[locationKey]||ACTIVITIES.other,[locationKey]);
+
+  function readLifeIntent(input=null){
+    let intent=input;
+    try{if(!intent)intent=JSON.parse(localStorage.getItem(OPEN_INTENT_KEY)||'null')}catch{intent=null}
+    if(!intent||String(intent.app||'').toLowerCase()!=='ahora'||!intent.eventId)return;
+    setLifeEvent({
+      eventId:String(intent.eventId),
+      eventType:String(intent.eventType||'life_event'),
+      title:String(intent.title||'Algo está pasando'),
+      body:String(intent.body||''),
+      payload:intent.payload&&typeof intent.payload==='object'?intent.payload:{}
+    });
+    setEventResult('');
+  }
+
+  useEffect(()=>{
+    readLifeIntent();
+    const handler=e=>{
+      const detail=e?.detail||{};
+      const data=detail?.data&&typeof detail.data==='object'?detail.data:{};
+      const payload=data?.payload&&typeof data.payload==='object'?data.payload:{};
+      if(String(detail?.app||'').toLowerCase().includes('private life')&&data.eventId){
+        readLifeIntent({
+          app:'ahora',
+          eventId:data.eventId,
+          eventType:data.eventType||'life_event',
+          title:detail.title,
+          body:detail.body,
+          payload
+        });
+      }
+    };
+    window.addEventListener('private-life:notification-open',handler);
+    return()=>window.removeEventListener('private-life:notification-open',handler);
+  },[]);
+
+  async function decideLifeEvent(decision){
+    if(!lifeEvent||eventBusy)return;
+    try{
+      setEventBusy(true);setError('');
+      const r=await fetch('/api/life/event-action',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({eventId:lifeEvent.eventId,decision})
+      });
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(data.error||'No se pudo registrar la decisión.');
+      setEventResult(decision==='engage'?'Has decidido intervenir. El mundo continuará desde esta decisión.':'Lo has dejado pasar. El mundo también recordará esa decisión.');
+      try{localStorage.removeItem(OPEN_INTENT_KEY)}catch{}
+      window.dispatchEvent(new CustomEvent('private-life:narrative-event',{detail:{
+        id:'life-decision-'+lifeEvent.eventId,
+        createdAt:new Date().toISOString(),
+        source:'player',
+        type:'life_event_decision',
+        title:lifeEvent.title,
+        text:decision==='engage'?'El jugador decidió intervenir.':'El jugador decidió dejarlo pasar.',
+        payload:{eventId:lifeEvent.eventId,eventType:lifeEvent.eventType,decision,...lifeEvent.payload}
+      }}));
+      if(decision==='engage'&&lifeEvent.payload?.contactId){
+        try{
+          localStorage.setItem(OPEN_INTENT_KEY,JSON.stringify({
+            app:'whatsapp',
+            contactId:String(lifeEvent.payload.contactId),
+            contactName:String(lifeEvent.payload.contactName||lifeEvent.title||''),
+            createdAt:new Date().toISOString()
+          }));
+        }catch{}
+        setTimeout(()=>onOpenApp?.('WhatsApp'),420);
+      }
+    }catch(e){setError(e.message||'No se pudo registrar la decisión.')}
+    finally{setEventBusy(false)}
+  }
+
+  function eventLabels(){
+    const type=String(lifeEvent?.eventType||'');
+    if(type==='encounter')return ['Acercarme','Dejarlo pasar'];
+    if(type==='social_window')return ['Seguir la conversación','Ahora no'];
+    if(type==='ambient')return ['Seguir','Ignorar'];
+    return ['Interactuar','Dejar pasar'];
+  }
 
   async function load(){
     try{
@@ -88,6 +172,15 @@ export default function NowApp({onClose}){
   return <div className="now-app">
     <header className="now-head"><button onClick={onClose} aria-label="Volver">‹</button><div><b>Ahora</b><span>Tu contexto cambia el mundo</span></div><i/></header>
     <main className="now-scroll">
+      {lifeEvent&&<section className="now-life-event">
+        <span>AHORA MISMO</span>
+        <h2>{lifeEvent.title}</h2>
+        {lifeEvent.body&&<p>{lifeEvent.body}</p>}
+        {!eventResult?<div className="now-life-actions">
+          <button className="primary" disabled={eventBusy} onClick={()=>decideLifeEvent('engage')}>{eventLabels()[0]}</button>
+          <button disabled={eventBusy} onClick={()=>decideLifeEvent('dismiss')}>{eventLabels()[1]}</button>
+        </div>:<div className="now-life-result">{eventResult}</div>}
+      </section>}
       <section className="now-current">
         <span>ESTADO ACTUAL</span>
         <b>{context?.locationLabel||'Casa'}</b>

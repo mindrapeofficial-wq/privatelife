@@ -43,13 +43,16 @@ function notificationMeta(item={}){
   const payload=data?.payload&&typeof data.payload==='object'?data.payload:{};
   return {
     contactId:String(data.contactId||payload.contactId||''),
+    contactName:String(data.contactName||payload.contactName||item?.title||''),
     messageId:String(data.messageId||payload.messageId||(String(data.eventType||'')==='whatsapp_message'?data.eventId||'':'')||''),
+    eventId:String(data.eventId||payload.eventId||''),
     eventType:String(data.eventType||payload.eventType||'')
   };
 }
 function logicalNotificationKey(item={}){
   const meta=notificationMeta(item);
   if(appKey(item?.app)==='whatsapp'&&meta.messageId)return 'whatsapp:'+meta.messageId;
+  if(meta.eventId)return 'event:'+meta.eventId;
   return 'id:'+String(item?.id||'');
 }
 function dedupeNotifications(list=[]){
@@ -325,7 +328,7 @@ export default function PhoneNotifications(){
             body:event.body||'',
             createdAt,
             priority:'normal',
-            data:{eventType:event.type||'life_event',payload:event.payload||{}}
+            data:{eventId:String(event.id||''),eventType:event.type||'life_event',payload:event.payload||{}}
           };
           window.dispatchEvent(new CustomEvent('private-life:notify',{detail}));
           try{
@@ -438,6 +441,15 @@ export default function PhoneNotifications(){
   },[target,items]);
 
   useEffect(()=>{
+    const onNativeOpen=e=>{
+      const detail=e?.detail||{};
+      if(detail&&typeof detail==='object')open(detail);
+    };
+    window.addEventListener('private-life:native-notification-open',onNativeOpen);
+    return()=>window.removeEventListener('private-life:native-notification-open',onNativeOpen);
+  },[]);
+
+  useEffect(()=>{
     if(!target)return;
     const down=e=>{const r=target.getBoundingClientRect(),y=e.clientY-r.top;if(y<=58&&!e.target.closest('button,input,textarea'))gesture.current={start:e.clientY,last:e.clientY}};
     const move=e=>{if(gesture.current)gesture.current.last=e.clientY};
@@ -449,20 +461,32 @@ export default function PhoneNotifications(){
   function markRead(id){setItems(current=>current.map(n=>n.id===id?{...n,read:true}:n))}
   function open(item){
     markRead(item.id);setBanner(null);setShade(false);
-    const wanted=appKey(item.app);
-    if(wanted==='whatsapp'){
-      try{
-        const meta=notificationMeta(item);
+    const meta=notificationMeta(item);
+    let wanted=appKey(item.app);
+    try{
+      if(wanted==='whatsapp'){
         localStorage.setItem(OPEN_INTENT,JSON.stringify({
           app:'whatsapp',
           contactId:meta.contactId,
-          contactName:String(item.title||''),
+          contactName:meta.contactName,
           messageId:meta.messageId,
           notificationId:String(item.id||''),
           createdAt:new Date().toISOString()
         }));
-      }catch{}
-    }
+      }else if(wanted==='private life'&&meta.eventId){
+        wanted='ahora';
+        localStorage.setItem(OPEN_INTENT,JSON.stringify({
+          app:'ahora',
+          eventId:meta.eventId,
+          eventType:meta.eventType||'life_event',
+          title:String(item.title||'PRIVATE LIFE'),
+          body:String(item.body||''),
+          payload:item?.data?.payload&&typeof item.data.payload==='object'?item.data.payload:{},
+          notificationId:String(item.id||''),
+          createdAt:new Date().toISOString()
+        }));
+      }
+    }catch{}
     window.dispatchEvent(new CustomEvent('private-life:notification-open',{detail:item}));
     if(item.href){if(item.href.startsWith('/'))location.href=item.href;return}
     const apps=[...document.querySelectorAll('.phone .ios-app')];

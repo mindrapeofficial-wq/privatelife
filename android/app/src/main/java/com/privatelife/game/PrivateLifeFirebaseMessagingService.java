@@ -73,7 +73,7 @@ public class PrivateLifeFirebaseMessagingService extends FirebaseMessagingServic
         }
 
         storePending(detail);
-        showSystemNotification(app, title, body, eventType, eventId);
+        showSystemNotification(app, title, body, eventType, eventId, detail);
     }
 
     private void storePending(JSONObject detail) {
@@ -97,7 +97,8 @@ public class PrivateLifeFirebaseMessagingService extends FirebaseMessagingServic
             String title,
             String body,
             String eventType,
-            String eventId
+            String eventId,
+            JSONObject detail
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
@@ -109,6 +110,7 @@ public class PrivateLifeFirebaseMessagingService extends FirebaseMessagingServic
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         intent.putExtra("push_event_type", eventType);
         intent.putExtra("push_event_id", eventId);
+        intent.putExtra("push_detail", detail == null ? "" : detail.toString());
 
         int requestCode = (eventType + ":" + eventId).hashCode();
         PendingIntent pendingIntent = PendingIntent.getActivity(

@@ -1405,3 +1405,18 @@
 .admin-console-entry.world .admin-console-copy{background:#191611;border-color:#332b20}
 @media(max-width:1100px){.admin-console-state{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-console-brain{grid-column:1/-1}}
 @media(max-width:760px){.admin-console-toolbar{align-items:stretch;flex-direction:column}.admin-console-toolbar input{width:100%;max-width:none;min-width:0}.admin-console-state{grid-template-columns:1fr}.admin-console-brain{grid-column:auto}.admin-console-stream{max-height:none}}
+
+
+/* Actionable Life Engine notifications */
+.now-life-event{
+  margin:0 0 14px;padding:17px;border-radius:22px;background:#fff;
+  border:1px solid rgba(0,0,0,.07);box-shadow:0 10px 28px rgba(20,20,28,.09)
+}
+.now-life-event>span{display:block;font-size:9px;font-weight:900;letter-spacing:1.3px;color:#777a84}
+.now-life-event h2{margin:8px 0 6px;font-size:21px;line-height:1.12;letter-spacing:-.45px}
+.now-life-event p{margin:0;color:#60636d;font-size:12.5px;line-height:1.48}
+.now-life-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:15px}
+.now-life-actions button{min-height:45px;border-radius:14px;border:1px solid rgba(0,0,0,.08);background:#f1f2f5;color:#292b31;font-size:11px;font-weight:800}
+.now-life-actions button.primary{background:#17181d;color:#fff;border-color:#17181d}
+.now-life-actions button:disabled{opacity:.52}
+.now-life-result{margin-top:14px;padding:11px 12px;border-radius:13px;background:#eef4ef;color:#3d6748;font-size:11px;line-height:1.4}

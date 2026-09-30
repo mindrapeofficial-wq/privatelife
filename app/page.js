@@ -317,7 +317,7 @@ function PhoneHome({identity,datingApps,appStore,authUser,logout,onInstallApp,on
          onOpenApp={name=>setOpened(name)}
          onClose={()=>setOpened(null)}
        />
-     : opened&&<AppWindow name={opened} onClose={()=>setOpened(null)} authUser={authUser} logout={logout}/>}
+     : opened&&<AppWindow name={opened} onClose={()=>setOpened(null)} onOpenApp={setOpened} authUser={authUser} logout={logout}/>}
  </div>
 }
 function normalizeAppId(value=''){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase().replace(/\s+/g,'-')}
@@ -360,8 +360,8 @@ function PhoneApp({src,name,onOpen,dock=false,cssIcon='',brand=false,editMode=fa
    {name&&<span className="ios-label">{name}</span>}
  </button>
 }
-function AppWindow({name,onClose,authUser,logout}){
- if(name==='Ahora')return <div className="app-window app-now native-window"><NowApp onClose={onClose}/></div>;
+function AppWindow({name,onClose,onOpenApp,authUser,logout}){
+ if(name==='Ahora')return <div className="app-window app-now native-window"><NowApp onClose={onClose} onOpenApp={onOpenApp}/></div>;
  if(name==='Private Life')return <div className="app-window app-private-life"><PrivateLifeApp onClose={onClose}/></div>;
  if(name==='WhatsApp')return <div className="app-window app-whatsapp native-window"><WhatsAppApp onClose={onClose}/></div>;
  if(name==='Mensajes')return <div className="app-window app-mensajes native-window"><MessagesApp onClose={onClose}/></div>;

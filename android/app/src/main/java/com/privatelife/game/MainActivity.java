@@ -46,6 +46,7 @@ public class MainActivity extends Activity {
     private static final String NOTIFICATION_CHANNEL_ID = "private_life_events";
     private static final String PREF_PUSH_TOKEN = "push_token";
     private static final String PREF_PENDING_PUSH = "pending_push";
+    private static final String PREF_PENDING_OPEN_PUSH = "pending_open_push";
 
     private WebView webView;
     private ValueCallback<Uri[]> pendingFileCallback;
@@ -68,6 +69,7 @@ public class MainActivity extends Activity {
         setContentView(webView);
 
         configureWebView();
+        rememberPushOpenIntent(getIntent());
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
@@ -200,6 +202,42 @@ public class MainActivity extends Activity {
             }
         } catch (Exception ignored) {
         }
+
+        String openRaw = getSharedPreferences(NATIVE_PREFS, MODE_PRIVATE)
+                .getString(PREF_PENDING_OPEN_PUSH, "");
+        if (openRaw != null && !openRaw.trim().isEmpty()) {
+            getSharedPreferences(NATIVE_PREFS, MODE_PRIVATE)
+                    .edit()
+                    .putString(PREF_PENDING_OPEN_PUSH, "")
+                    .apply();
+            String js =
+                    "window.dispatchEvent(new CustomEvent('private-life:native-notification-open',{detail:"
+                    + openRaw
+                    + "}));";
+            webView.evaluateJavascript(js, null);
+        }
+    }
+
+    private void rememberPushOpenIntent(Intent intent) {
+        if (intent == null) {
+            return;
+        }
+        String detail = intent.getStringExtra("push_detail");
+        if (detail == null || detail.trim().isEmpty()) {
+            return;
+        }
+        getSharedPreferences(NATIVE_PREFS, MODE_PRIVATE)
+                .edit()
+                .putString(PREF_PENDING_OPEN_PUSH, detail)
+                .apply();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        rememberPushOpenIntent(intent);
+        syncNativePushWithPage();
     }
 
     private void configureWebView() {
