@@ -1,5 +1,6 @@
 import { ensureSchema, query } from './lib/db.js';
 import { scheduleLifeEngine } from './lib/life-scheduler.js';
+import { processPushTick } from './lib/push-dispatcher.js';
 
 export async function startLifeEngineLoop() {
   if (globalThis.__privateLifeBackgroundScheduler) return;
@@ -22,13 +23,22 @@ export async function startLifeEngineLoop() {
           console.error('life_background_player_failed', user.id, String(error?.message || error).slice(0,200));
         }
       }
+
+      try {
+        const push = await processPushTick({skipVisible:true});
+        if (!push.configured || push.pushSent || push.lifePushes || push.whatsappPushes) {
+          console.log('PUSH_ENGINE', JSON.stringify(push));
+        }
+      } catch (error) {
+        console.error('push_background_tick_failed', String(error?.message || error).slice(0,300));
+      }
     } catch (error) {
       console.error('life_background_tick_failed', String(error?.message || error).slice(0,300));
     }
   }
 
-  const initial = setTimeout(run, 12000);
+  const initial = setTimeout(run, 8000);
   initial.unref?.();
-  const timer = setInterval(run, 60000);
+  const timer = setInterval(run, 45000);
   timer.unref?.();
 }

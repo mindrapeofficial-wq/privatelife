@@ -169,6 +169,73 @@ export default function PhoneNotifications(){
 
   useEffect(()=>{
     let cancelled=false;
+    let currentToken='';
+    let retryTimer=null;
+
+    async function registerNativePushToken(value){
+      const token=String(value||'').trim();
+      if(token.length<20||cancelled)return false;
+      currentToken=token;
+      try{
+        const response=await fetch('/api/push/register',{
+          method:'POST',
+          cache:'no-store',
+          credentials:'same-origin',
+          headers:{Accept:'application/json','content-type':'application/json'},
+          body:JSON.stringify({token,platform:'android',enabled:true})
+        });
+        if(!response.ok)return false;
+        const data=await response.json().catch(()=>({}));
+        if(cancelled)return false;
+        window.dispatchEvent(new CustomEvent('private-life:push-ready',{detail:{
+          configured:data?.configured!==false,
+          testPushSent:Number(data?.testPushSent)||0
+        }}));
+        return true;
+      }catch{
+        return false;
+      }
+    }
+
+    function retrySoon(){
+      clearTimeout(retryTimer);
+      retryTimer=setTimeout(()=>{
+        const token=window.__PRIVATE_LIFE_PUSH_TOKEN__||currentToken;
+        if(token)registerNativePushToken(token).then(ok=>{if(!ok)retrySoon()});
+      },12000);
+    }
+
+    const onToken=e=>{
+      const token=e?.detail?.token||'';
+      registerNativePushToken(token).then(ok=>{if(!ok)retrySoon()});
+    };
+    const onFocus=()=>{
+      const token=window.__PRIVATE_LIFE_PUSH_TOKEN__||currentToken;
+      if(token)registerNativePushToken(token);
+    };
+
+    window.addEventListener('private-life:native-push-token',onToken);
+    window.addEventListener('focus',onFocus);
+
+    const initial=window.__PRIVATE_LIFE_PUSH_TOKEN__||'';
+    if(initial)registerNativePushToken(initial).then(ok=>{if(!ok)retrySoon()});
+
+    const heartbeat=setInterval(()=>{
+      const token=window.__PRIVATE_LIFE_PUSH_TOKEN__||currentToken;
+      if(token)registerNativePushToken(token);
+    },120000);
+
+    return()=>{
+      cancelled=true;
+      clearTimeout(retryTimer);
+      clearInterval(heartbeat);
+      window.removeEventListener('private-life:native-push-token',onToken);
+      window.removeEventListener('focus',onFocus);
+    };
+  },[]);
+
+  useEffect(()=>{
+    let cancelled=false;
     async function backgroundWhatsAppPoll(){
       try{
         const contacts=JSON.parse(localStorage.getItem(CONTACTS)||'[]');

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '../../../../lib/auth.js';
 import { ensureSchema, query } from '../../../../lib/db.js';
-import { isFcmConfigured } from '../../../../lib/push-fcm.js';
+import { isFcmConfigured, sendPushToUser } from '../../../../lib/push-fcm.js';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -21,6 +21,12 @@ export async function POST(request){
     const enabled=body?.enabled!==false;
     if(token.length<20)return NextResponse.json({error:'Token push no válido.'},{status:400});
 
+    const previous=await query(
+      "SELECT id,user_id,enabled FROM private_life.push_devices WHERE token=$1 LIMIT 1",
+      [token]
+    );
+    const alreadyLinked=previous.rows.some(row=>Number(row.user_id)===Number(user.id)&&row.enabled===true);
+
     await query(
       `INSERT INTO private_life.push_devices
         (user_id,token,platform,enabled,last_seen_at,created_at,updated_at)
@@ -39,7 +45,21 @@ export async function POST(request){
       [user.id,enabled?'Push activado':'Push desactivado',JSON.stringify({platform,enabled})]
     );
 
-    return NextResponse.json({ok:true,enabled,configured:isFcmConfigured()});
+    const configured=isFcmConfigured();
+    let testPushSent=0;
+    if(enabled&&!alreadyLinked&&configured){
+      const test=await sendPushToUser(user.id,{
+        app:'PRIVATE LIFE',
+        title:'PRIVATE LIFE está conectado',
+        body:'Tu teléfono ya puede recibir mensajes, llamadas y acontecimientos aunque el juego esté cerrado.',
+        eventType:'push_ready',
+        eventId:'device-'+Date.now(),
+        payload:{source:'push_registration'}
+      });
+      testPushSent=test.sent||0;
+    }
+
+    return NextResponse.json({ok:true,enabled,configured,testPushSent});
   }catch(error){
     console.error('push_register_failed',error);
     return NextResponse.json({error:'No se pudo registrar este dispositivo.'},{status:500});
