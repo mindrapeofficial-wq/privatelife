@@ -11,6 +11,7 @@ const STORY='private-life-narrative-events-v1';
 const MESSAGE_INBOX='private-life-messages-v1';
 const FORCE_LUISA_TEST='private-life-force-luisa-test-v1';
 const MAX_NOTIFICATIONS=60;
+const OPEN_INTENT='private-life-open-intent-v1';
 
 const appGlyphs={
   'whatsapp':'◉','mensajes':'●','instagram':'◎','facebook':'f','tinder':'♥','grindr':'◆',
@@ -37,8 +38,34 @@ function normalize(value=''){
   return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
 }
 function phonePrefs(){try{return {notifications:true,badges:true,vibration:true,previews:true,...JSON.parse(localStorage.getItem(PHONE_SETTINGS)||'{}')}}catch{return {notifications:true,badges:true,vibration:true,previews:true}}}
+function notificationMeta(item={}){
+  const data=item?.data&&typeof item.data==='object'?item.data:{};
+  const payload=data?.payload&&typeof data.payload==='object'?data.payload:{};
+  return {
+    contactId:String(data.contactId||payload.contactId||''),
+    messageId:String(data.messageId||payload.messageId||(String(data.eventType||'')==='whatsapp_message'?data.eventId||'':'')||''),
+    eventType:String(data.eventType||payload.eventType||'')
+  };
+}
+function logicalNotificationKey(item={}){
+  const meta=notificationMeta(item);
+  if(appKey(item?.app)==='whatsapp'&&meta.messageId)return 'whatsapp:'+meta.messageId;
+  return 'id:'+String(item?.id||'');
+}
+function dedupeNotifications(list=[]){
+  const seen=new Set();
+  return list.filter(item=>{
+    const key=logicalNotificationKey(item);
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
 function load(){
-  try{const value=JSON.parse(localStorage.getItem(STORAGE)||'[]');return Array.isArray(value)?value.slice(0,MAX_NOTIFICATIONS):[]}catch{return []}
+  try{
+    const value=JSON.parse(localStorage.getItem(STORAGE)||'[]');
+    return Array.isArray(value)?dedupeNotifications(value).slice(0,MAX_NOTIFICATIONS):[];
+  }catch{return []}
 }
 function relativeTime(iso){
   const diff=Math.max(0,Date.now()-new Date(iso).getTime());
@@ -338,7 +365,15 @@ export default function PhoneNotifications(){
         createdAt:detail.createdAt||new Date().toISOString(),read:false,priority:detail.priority||'normal',
         data:detail.data&&typeof detail.data==='object'?detail.data:{}
       };
-      setItems(current=>[item,...current.filter(n=>n.id!==item.id)].slice(0,MAX_NOTIFICATIONS));
+      setItems(current=>{
+        const key=logicalNotificationKey(item);
+        const existing=current.find(n=>logicalNotificationKey(n)===key);
+        if(existing&&key.startsWith('whatsapp:')){
+          const merged={...existing,...item,id:existing.id,read:existing.read};
+          return [merged,...current.filter(n=>n.id!==existing.id&&logicalNotificationKey(n)!==key)].slice(0,MAX_NOTIFICATIONS);
+        }
+        return [item,...current.filter(n=>n.id!==item.id&&logicalNotificationKey(n)!==key)].slice(0,MAX_NOTIFICATIONS);
+      });
       setBanner(item.id);
       const targetKey=appKey(item.app);
       requestAnimationFrame(()=>{
@@ -414,9 +449,22 @@ export default function PhoneNotifications(){
   function markRead(id){setItems(current=>current.map(n=>n.id===id?{...n,read:true}:n))}
   function open(item){
     markRead(item.id);setBanner(null);setShade(false);
+    const wanted=appKey(item.app);
+    if(wanted==='whatsapp'){
+      try{
+        const meta=notificationMeta(item);
+        localStorage.setItem(OPEN_INTENT,JSON.stringify({
+          app:'whatsapp',
+          contactId:meta.contactId,
+          contactName:String(item.title||''),
+          messageId:meta.messageId,
+          notificationId:String(item.id||''),
+          createdAt:new Date().toISOString()
+        }));
+      }catch{}
+    }
     window.dispatchEvent(new CustomEvent('private-life:notification-open',{detail:item}));
     if(item.href){if(item.href.startsWith('/'))location.href=item.href;return}
-    const wanted=appKey(item.app);
     const apps=[...document.querySelectorAll('.phone .ios-app')];
     const app=apps.find(a=>appKey(a.dataset.appName||a.dataset.appId||a.textContent)===wanted);
     if(app)setTimeout(()=>app.click(),80);

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 const CONTACTS_KEY='private-life-contacts';
 const STORY_KEY='private-life-narrative-events-v1';
+const OPEN_INTENT_KEY='private-life-open-intent-v1';
 
 function uid(){return crypto.randomUUID?.()||Math.random().toString(36).slice(2)+Date.now().toString(36)}
 function readJson(key,fallback){try{const v=JSON.parse(localStorage.getItem(key)||'null');return v??fallback}catch{return fallback}}
@@ -66,11 +67,14 @@ export default function WhatsAppApp({onClose}){
  async function refreshMessages(nextContacts){
    try{
      const data=await api('/api/whatsapp',{cache:'no-store'});
-     if(!mounted.current)return;
-     setChats(prev=>groupMessages(nextContacts||contacts,data.messages||[],prev));
+     if(!mounted.current)return [];
+     const messages=data.messages||[];
+     setChats(prev=>groupMessages(nextContacts||contacts,messages,prev));
      setOnline(true);
+     return messages;
    }catch{
      if(mounted.current)setOnline(false);
+     return [];
    }
  }
 
@@ -97,12 +101,58 @@ export default function WhatsAppApp({onClose}){
    }catch{}
  }
 
+ async function openNotificationIntent(raw,nextContacts){
+   const intent=raw&&typeof raw==='object'?raw:{};
+   const data=intent?.data&&typeof intent.data==='object'?intent.data:{};
+   const payload=data?.payload&&typeof data.payload==='object'?data.payload:{};
+   const list=Array.isArray(nextContacts)&&nextContacts.length?nextContacts:contactsFromStorage();
+   const contactId=String(intent.contactId||data.contactId||payload.contactId||'');
+   const contactName=String(intent.contactName||intent.title||'');
+   const messageId=String(intent.messageId||data.messageId||payload.messageId||(String(data.eventType||'')==='whatsapp_message'?data.eventId||'':'')||'');
+   const contact=list.find(c=>contactId&&String(c.id)===contactId)
+     ||list.find(c=>contactName&&canonicalName(c.name)===canonicalName(contactName));
+   if(!contact)return false;
+
+   await refreshMessages(list);
+   if(!mounted.current)return false;
+   setActiveId(contact.id);
+   setChats(prev=>({...prev,[contact.id]:{...(prev[contact.id]||{messages:[]}),unread:0}}));
+   try{
+     await api('/api/whatsapp',{method:'POST',body:JSON.stringify({action:'read',contact:contactPayload(contact)})});
+   }catch{}
+   try{
+     const pending=readJson(OPEN_INTENT_KEY,null);
+     const same=!pending||(!messageId||String(pending.messageId||'')===messageId);
+     if(same)localStorage.removeItem(OPEN_INTENT_KEY);
+   }catch{}
+   window.dispatchEvent(new CustomEvent('private-life:whatsapp-message-opened',{detail:{
+     contactId:contact.id,contactName:contact.name,messageId
+   }}));
+   return true;
+ }
+
  useEffect(()=>{
    const c=contactsFromStorage();setContacts(c);setChats(groupMessages(c,[]));setReady(true);
    refreshMessages(c);pollDirector(c);refreshLifeStates();
+
+   const pending=readJson(OPEN_INTENT_KEY,null);
+   if(pending?.app==='whatsapp')setTimeout(()=>openNotificationIntent(pending,c),0);
+
    const sync=()=>{const next=contactsFromStorage();setContacts(next);refreshMessages(next);pollDirector(next);refreshLifeStates()};
-   window.addEventListener('storage',sync);window.addEventListener('private-life:contacts-changed',sync);
-   return()=>{window.removeEventListener('storage',sync);window.removeEventListener('private-life:contacts-changed',sync)};
+   const onNotificationOpen=e=>{
+     const detail=e?.detail||{};
+     if(String(detail?.app||'').toLowerCase().includes('whatsapp')){
+       openNotificationIntent(detail,contactsFromStorage());
+     }
+   };
+   window.addEventListener('storage',sync);
+   window.addEventListener('private-life:contacts-changed',sync);
+   window.addEventListener('private-life:notification-open',onNotificationOpen);
+   return()=>{
+     window.removeEventListener('storage',sync);
+     window.removeEventListener('private-life:contacts-changed',sync);
+     window.removeEventListener('private-life:notification-open',onNotificationOpen);
+   };
  },[]);
 
  useEffect(()=>{
