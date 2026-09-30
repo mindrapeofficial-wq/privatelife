@@ -154,7 +154,7 @@ export default function FacebookApp({onClose}){
           <div className="fb-section-head"><b>Solicitudes de amistad</b><button onClick={()=>setTab('people')}>Ver todas</button></div>
           <div className="fb-request-scroll">{data.requests.slice(0,5).map(u=><RequestCard key={u.id} user={u} busy={busy} accept={()=>action({action:'respond_request',requestId:u.requestId,accept:true})} reject={()=>action({action:'respond_request',requestId:u.requestId,accept:false})} open={()=>setProfile(u)}/>)}</div>
         </section>}
-        <div className="fb-feed">{data.posts.length?data.posts.map(post=><Post key={post.id} post={post} me={data.me} comment={comments[post.id]||''} setComment={v=>setComments(x=>({...x,[post.id]:v}))} onProfile={()=>setProfile(post.author)} onLike={()=>action({action:'toggle_like',postId:post.id})} onComment={async()=>{const t=(comments[post.id]||'').trim();if(!t)return;if(await action({action:'comment',postId:post.id,text:t}))setComments(x=>({...x,[post.id]:''}))}}/>):<Empty title="Tu feed está tranquilo" text="Añade amigos y publica algo para empezar."/ >}</div>
+        <div className="fb-feed">{data.posts.length?data.posts.map(post=><Post key={post.id} post={post} me={data.me} comment={comments[post.id]||''} setComment={v=>setComments(x=>({...x,[post.id]:v}))} onProfile={()=>setProfile(post.author)} onLike={()=>action({action:'toggle_like',postId:post.id})} onComment={async()=>{const t=(comments[post.id]||'').trim();if(!t)return;if(await action({action:'comment',postId:post.id,text:t}))setComments(x=>({...x,[post.id]:''}))}}/>):<Empty title="Tu feed está tranquilo" text="Añade amigos y publica algo para empezar."/>}</div>
       </>}
 
       {tab==='people'&&<section className="fb-people">
