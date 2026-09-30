@@ -1,32 +1,71 @@
-/* PRIVATE LIFE · navegación táctil más clara */
-/* Objetivo: zonas táctiles >= 44px y controles de vuelta fáciles de reconocer. */
+/* PRIVATE LIFE · sistema unificado de navegación táctil
+   Todos los controles de regreso principales usan una zona táctil mínima de 44x44px. */
 
-.settings-nav{grid-template-columns:96px 1fr 96px!important;min-height:54px!important;height:54px!important;}
-.settings-nav>button:first-child{width:100%!important;height:54px!important;min-width:96px!important;padding:0 10px!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:4px!important;font-size:0!important;line-height:1!important;border-radius:0!important;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-.settings-nav>button:first-child::before{content:'‹';font-size:35px;line-height:1;font-weight:400;margin-top:-2px;}
-.settings-nav>button:first-child::after{content:'Atrás';font-size:15px;line-height:1;font-weight:500;letter-spacing:-.01em;}
-.settings-nav>button:first-child:active{opacity:.48;}
+.pl-unified-back{
+  width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;
+  padding:0!important;border:0!important;border-radius:50%!important;
+  display:grid!important;place-items:center!important;
+  font-size:32px!important;font-weight:400!important;line-height:1!important;
+  letter-spacing:0!important;text-transform:none!important;
+  cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  transition:transform .11s ease,background-color .11s ease,opacity .11s ease,filter .11s ease;
+}
+.pl-unified-back:active{transform:scale(.91)!important;filter:brightness(.92)}
+.pl-unified-back:focus-visible{outline:2px solid #0a84ff!important;outline-offset:2px!important}
 
-/* Contactos: incluso cuando el texto sea solo ‹, toda la esquina izquierda responde. */
-.nc-nav{min-height:54px!important;}
-.nc-nav-left{min-width:86px!important;min-height:54px!important;margin:-4px 0!important;padding:0 10px!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-.nc-nav-left:active{opacity:.48;}
+.pl-labeled-back{
+  min-height:44px!important;padding:0 8px!important;display:flex!important;align-items:center!important;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+}
+.pl-labeled-back:active{opacity:.5}
 
-/* Notas: botón principal de vuelta con texto y una zona táctil amplia. */
-.pl-notes-nav{grid-template-columns:96px 1fr 96px!important;min-height:52px!important;}
-.pl-notes-back{width:96px!important;height:52px!important;margin-left:-8px!important;padding:0 8px!important;display:flex!important;align-items:center!important;gap:3px!important;font-size:0!important;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-.pl-notes-back::before{content:'‹';font-size:35px;line-height:1;font-weight:400;margin-top:-2px;}
-.pl-notes-back::after{content:'Atrás';font-size:15px;line-height:1;font-weight:500;}
-.pl-notes-back:active,.pl-notes-listback:active{opacity:.48;}
-.pl-notes-listback{min-width:100px!important;min-height:48px!important;display:flex!important;align-items:center!important;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+/* Contactos */
+.nc-nav{min-height:64px!important}
+.nc-nav-left.pl-unified-back{background:#1c1c1e!important;color:#0a84ff!important;justify-self:start!important}
+.nc-nav-left.pl-unified-back span{font-size:38px!important;line-height:1!important;transform:translate(-1px,-2px)}
+.nc-nav-left.pl-labeled-back{min-width:106px!important;color:#0a84ff!important;font-size:14px!important}
+.nc-nav-add{width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important}
 
-/* Ventanas sencillas del teléfono. */
-.app-window-head>button:first-child{min-width:88px!important;min-height:50px!important;margin-left:-8px!important;padding:0 10px!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-.app-window-head>button:first-child:active{opacity:.48;}
+/* Ajustes */
+.settings-nav{height:58px!important;min-height:58px!important;grid-template-columns:58px 1fr 58px!important;padding:0 7px!important}
+.settings-nav .pl-unified-back{background:#e5e5ea!important;color:#087cff!important;justify-self:start!important;font-size:37px!important}
+
+/* Facebook */
+.fb-top{min-height:62px!important;padding-left:10px!important}
+.fb-close.pl-unified-back,.fb-chat-back.pl-unified-back{background:#e4e6eb!important;color:#050505!important;font-size:34px!important}
+.fb-chat-back.pl-unified-back{flex:0 0 44px!important}
+
+/* App Store */
+.store-topbar{grid-template-columns:52px 1fr 38px!important;padding-left:12px!important}
+.store-topbar .pl-unified-back{background:#e5e5ea!important;color:#0a84ff!important;justify-self:start!important;font-size:36px!important}
+
+/* Notas nativas */
+.pl-notes-nav{min-height:58px!important;height:58px!important;grid-template-columns:58px 1fr 58px!important;padding:0 8px!important}
+.pl-notes-back.pl-unified-back{background:#e5e5ea!important;color:#b88300!important;justify-self:start!important;font-size:37px!important}
+.pl-notes-listback.pl-labeled-back{min-width:106px!important;height:44px!important;margin-left:-4px!important;padding:0 5px!important;font-size:16px!important;color:#b88300!important}
+
+/* Notas / Narrador en ruta completa */
+.notesTop>.pl-unified-back{background:#e5e5ea!important;color:#b88300!important;justify-self:start!important;font-size:37px!important}
+.narratorTop>.pl-unified-back{background:#20232b!important;color:#f1f3f7!important;justify-self:start!important;font-size:37px!important}
+
+/* Fotos */
+.pl-photos-headrow>.pl-unified-back{background:#f2f2f7!important;color:#087cff!important;flex:0 0 44px!important;font-size:37px!important}
+.pl-photos-viewer-top>.pl-unified-back{background:#202124cc!important;color:#fff!important;justify-self:start!important;font-size:37px!important}
+
+/* Herramientas / ficha de personaje y galería antigua */
+.pl-tools-close.pl-unified-back,.pl-gallery-close.pl-unified-back{
+  background:#242b37!important;color:#fff!important;flex:0 0 44px!important;font-size:37px!important;
+}
+
+/* Instagram / importación */
+.pl-ig-top{grid-template-columns:52px 1fr 42px!important;padding-left:8px!important}
+.pl-ig-back.pl-unified-back{background:#efeff2!important;color:#111!important;justify-self:start!important;font-size:37px!important}
+
+/* Ventanas simples del teléfono */
+.app-window-head{grid-template-columns:54px 1fr 54px!important;padding-left:9px!important;padding-right:9px!important}
+.app-window-head>.pl-unified-back{background:#e5e5ea!important;color:#1479ff!important;justify-self:start!important;font-size:37px!important}
 
 @media(max-width:360px){
-  .settings-nav{grid-template-columns:86px 1fr 86px!important;}
-  .settings-nav>button:first-child{min-width:86px!important;}
-  .pl-notes-nav{grid-template-columns:88px 1fr 88px!important;}
-  .pl-notes-back{width:88px!important;}
+  .pl-unified-back{width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important}
+  .settings-nav,.pl-notes-nav{grid-template-columns:52px 1fr 52px!important}
 }
