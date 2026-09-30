@@ -289,6 +289,7 @@ function PhoneHome({identity,datingApps,appStore,authUser,logout,onInstallApp,on
      : opened&&<AppWindow name={opened} onClose={()=>setOpened(null)} authUser={authUser} logout={logout}/>}
  </div>
 }
+function normalizeAppId(value=''){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase().replace(/\s+/g,'-')}
 function PhoneApp({src,name,onOpen,dock=false,cssIcon='',brand=false,editMode=false,removable=false,appId='',onEditStart,onRemove}){
  const holdRef=useRef(null);
  const longPressRef=useRef(false);
@@ -313,6 +314,8 @@ function PhoneApp({src,name,onOpen,dock=false,cssIcon='',brand=false,editMode=fa
  function contextMenu(e){e.preventDefault();e.stopPropagation();onEditStart?.()}
  return <button
    className={'ios-app '+(dock?'dock-app ':'')+(editMode?'editing ':'')+(removable?'removable':'protected')}
+   data-app-name={name||appId||''}
+   data-app-id={appId||normalizeAppId(name)}
    onPointerDown={pressStart}
    onPointerUp={pressEnd}
    onPointerCancel={pressEnd}
@@ -341,7 +344,7 @@ function AppWindow({name,onClose,authUser,logout}){
 }
 
 const PHONE_SETTINGS_KEY='private-life-phone-settings-v1';
-const PHONE_SETTINGS_DEFAULTS={notifications:true,vibration:true,previews:true};
+const PHONE_SETTINGS_DEFAULTS={notifications:true,badges:true,vibration:true,previews:true};
 
 function SettingsApp({onClose,authUser,logout}){
  const [screen,setScreen]=useState('root');
@@ -388,6 +391,7 @@ function SettingsApp({onClose,authUser,logout}){
      <div className="settings-section-label">NOTIFICACIONES</div>
      <section className="settings-group">
        <SettingsToggle icon="🔔" label="Notificaciones" checked={prefs.notifications} onChange={v=>update('notifications',v)}/>
+       <SettingsToggle icon="🔴" label="Globos en iconos" checked={prefs.badges!==false} onChange={v=>update('badges',v)}/>
        <SettingsToggle icon="📳" label="Vibración" checked={prefs.vibration} onChange={v=>update('vibration',v)}/>
        <SettingsToggle icon="💬" label="Mostrar previsualizaciones" checked={prefs.previews} onChange={v=>update('previews',v)}/>
      </section>
