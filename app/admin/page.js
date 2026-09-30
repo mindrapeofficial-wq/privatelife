@@ -99,7 +99,7 @@ export default function AdminPage(){
   const [ready,setReady]=useState(false),[users,setUsers]=useState([]),[selectedId,setSelectedId]=useState('');
   const [player,setPlayer]=useState(null),[tab,setTab]=useState('overview'),[charId,setCharId]=useState('');
   const [eventDraft,setEventDraft]=useState(''),[chatDraft,setChatDraft]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[aiHealth,setAiHealth]=useState(null),[aiHealthBusy,setAiHealthBusy]=useState(false);
-  const [chat,setChat]=useState([{role:'ai',text:'Director conectado. Selecciona una partida y pregúntame qué está ocurriendo.'}]);
+  const [chat,setChat]=useState([{role:'ai',text:'Director IA central conectado. Puedo analizar la partida y usar las herramientas narrativas del panel cuando me lo pidas.'}]);
 
   async function loadUsers(preferred){
     const data=await api('/api/admin/users',{cache:'no-store'});
@@ -261,39 +261,31 @@ export default function AdminPage(){
     setEventDraft('');await persist(next,'Evento creado: '+text);
   }
   async function sendDirector(e){
-    e.preventDefault();const prompt=chatDraft.trim();if(!prompt||!player)return;
-    setChatDraft('');setChat(v=>[...v,{role:'admin',text:prompt}]);
-    const lower=prompt.toLowerCase();
-    if(lower.includes('ponte al día')||lower.includes('resumen')||lower.includes('resume')){
-      setChat(v=>[...v,{role:'ai',text:`Partida de @${player.username}: ${chars.length} personajes, ${events.filter(x=>x.status!=='cerrado').length} eventos abiertos. Personaje del jugador: ${save.identity?.name||'sin definir'}. Último guardado: ${fmt(player.updatedAt)}.`}]);return;
-    }
-    const m=prompt.match(/(?:crea|añade|mete)(?: un| una)? personaje(?: nuevo)?(?: llamado| llamada)?\s+([^,.]+)/i);
-    if(m){
-      const name=m[1].trim().slice(0,60),next=addCharacter(name);await persist(next,'Personaje creado: '+name);
-      setChat(v=>[...v,{role:'ai',text:`He creado proceduralmente a ${name}. Ya tiene edad, rol, profesión, ubicación, apariencia, personalidad, comunicación, objetivos, límites, secreto y parámetros internos coherentes.`}]);setTab('characters');return;
-    }
-    const whatsappMatch=prompt.match(/(?:manda|env[ií]a|escribe)(?: un)? whatsapp a\s+([^:]{1,80}):\s*(.+)/i);
-    if(whatsappMatch){
-      const contactName=whatsappMatch[1].trim().slice(0,80),message=whatsappMatch[2].trim().slice(0,2000);
-      const next=structuredClone(save);
-      next.world.events.unshift({
-        id:uid(),
-        description:'WhatsApp de '+contactName+': '+message,
-        status:'pendiente',
-        trigger:'director',
-        channel:'whatsapp',
-        contactName,
-        message,
-        createdAt:new Date().toISOString()
+    e.preventDefault();
+    const prompt=chatDraft.trim();
+    if(!prompt||!player||busy)return;
+    const previous=chat.slice(-10);
+    setChatDraft('');
+    setChat(v=>[...v,{role:'admin',text:prompt}]);
+    setBusy(true);
+    try{
+      const data=await api('/api/admin/director',{
+        method:'POST',
+        body:JSON.stringify({userId:player.id,prompt,history:previous})
       });
-      await persist(next,'WhatsApp programado para '+contactName);
-      setChat(v=>[...v,{role:'ai',text:'He dejado preparado un WhatsApp de '+contactName+'. Se entregará de forma invisible cuando el teléfono del jugador sincronice.'}]);
-      setTab('phone');
-      return;
+      const actions=Array.isArray(data.executed)?data.executed:[];
+      const actionText=actions.length?'\n\nACCIONES EJECUTADAS\n'+actions.map(x=>'• '+(x.detail||x.type)).join('\n'):'';
+      setChat(v=>[...v,{role:'ai',text:(data.reply||'He revisado la partida.')+actionText}]);
+      if(data.save)setPlayer(cur=>cur?{...cur,save:world(data.save),updatedAt:new Date().toISOString()}:cur);
+      await refreshPhone(player.id);
+      await loadUsers(player.id);
+      setNotice(actions.length?'Director IA ejecutó '+actions.length+' acción'+(actions.length===1?'':'es')+'.':'Director IA ha analizado la partida.');
+      setTimeout(()=>setNotice(''),1800);
+    }catch(error){
+      setChat(v=>[...v,{role:'ai',text:'No he podido completar esa intervención: '+error.message}]);
+    }finally{
+      setBusy(false);
     }
-    const ev=prompt.match(/(?:programa|crea|añade|lanza)(?: un)? evento[:\s]+(.+)/i);
-    if(ev){await addEvent(ev[1]);setChat(v=>[...v,{role:'ai',text:'Evento añadido a la cola narrativa. El jugador no verá que procede del panel.'}]);setTab('events');return}
-    setChat(v=>[...v,{role:'ai',text:'Puedo resumir la partida, crear personajes y programar eventos. También puedes editar manualmente cualquier ficha.'}]);
   }
   async function logout(){try{await api('/api/auth/logout',{method:'POST',body:'{}'})}catch{}window.location.replace('/')}
 
@@ -379,7 +371,7 @@ export default function AdminPage(){
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>COLA NARRATIVA</span></div><div className="admin-event-list">{events.map(ev=><div key={ev.id} className="admin-event"><div><b>{ev.description}</b><small>{fmt(ev.createdAt)} · {ev.trigger||'manual'}</small></div><select value={ev.status||'pendiente'} onChange={e=>localEdit(next=>{next.world.events=next.world.events.map(x=>x.id===ev.id?{...x,status:e.target.value}:x)})}><option value="pendiente">Pendiente</option><option value="activo">Activo</option><option value="cerrado">Cerrado</option></select></div>)}{!events.length&&<div className="admin-empty">No hay eventos programados.</div>}</div><button className="admin-primary secondary" disabled={busy} onClick={()=>persist(save,'Estados de eventos actualizados')}>Guardar estados</button></section>
         </div>}
 
-        {tab==='director'&&<section className="admin-card admin-director"><div className="admin-card-head"><span>DIRECTOR IA · @{player.username}</span><button onClick={testCentralAI} disabled={aiHealthBusy}>{aiHealthBusy?'Probando…':'Probar IA central'}</button></div>{aiHealth&&<div className={'admin-ai-health '+(aiHealth.ok?'ok':'bad')}><b>{aiHealth.ok?'IA CENTRAL CONECTADA':'IA CENTRAL CON PROBLEMAS'}</b><span>Proveedor: {aiHealth.provider?aiHealth.provider.toUpperCase():'—'} · Clave: {aiHealth.configured?'detectada':'no detectada'} · Red: {aiHealth.reachable?'OK':'fallo'} · Modelo: {aiHealth.model||'—'}{aiHealth.latencyMs!=null?' · '+aiHealth.latencyMs+' ms':''}</span>{aiHealth.message&&<p>{aiHealth.message}</p>}</div>}<div className="admin-chat">{chat.map((m,i)=><div key={i} className={'admin-message '+m.role}><b>{m.role==='ai'?'DIRECTOR AI':'ADMIN'}</b><p>{m.text}</p></div>)}</div><form className="admin-chat-form" onSubmit={sendDirector}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} placeholder="Ej.: Ponte al día · Crea personaje llamado Irene · Manda WhatsApp a Irene: ¿Dónde estás? · Programa evento: ..."/><button disabled={!chatDraft.trim()||busy}>Enviar</button></form></section>}
+        {tab==='director'&&<section className="admin-card admin-director"><div className="admin-card-head"><span>DIRECTOR IA · @{player.username}</span><button onClick={testCentralAI} disabled={aiHealthBusy}>{aiHealthBusy?'Probando…':'Probar IA central'}</button></div>{aiHealth&&<div className={'admin-ai-health '+(aiHealth.ok?'ok':'bad')}><b>{aiHealth.ok?'IA CENTRAL CONECTADA':'IA CENTRAL CON PROBLEMAS'}</b><span>Proveedor: {aiHealth.provider?aiHealth.provider.toUpperCase():'—'} · Clave: {aiHealth.configured?'detectada':'no detectada'} · Red: {aiHealth.reachable?'OK':'fallo'} · Modelo: {aiHealth.model||'—'}{aiHealth.latencyMs!=null?' · '+aiHealth.latencyMs+' ms':''}</span>{aiHealth.message&&<p>{aiHealth.message}</p>}</div>}<div className="admin-chat">{chat.map((m,i)=><div key={i} className={'admin-message '+m.role}><b>{m.role==='ai'?'DIRECTOR AI':'ADMIN'}</b><p>{m.text}</p></div>)}</div><form className="admin-chat-form" onSubmit={sendDirector}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} placeholder="Habla con el Director: resume la partida, crea o modifica personajes, ajusta variables, programa eventos o WhatsApps, analiza el teléfono..."/><button disabled={!chatDraft.trim()||busy}>Enviar</button></form></section>}
       </>}
     </section>
   </main>
