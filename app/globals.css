@@ -437,3 +437,16 @@
 .wa-input-wrap input::placeholder{color:#8696a0}
 .wa-camera{width:38px;height:38px;border:0;background:transparent;color:#8696a0;font-size:20px}
 @media(max-width:380px){.wa-chat-row{grid-template-columns:49px 1fr 44px;padding-left:9px}.wa-avatar.lg{width:47px;height:47px}.wa-bubble{max-width:86%}}
+
+.wa-offline{margin:0 12px 8px;padding:7px 10px;border-radius:9px;background:#3a2b15;color:#f4cf82;font-size:10px;text-align:center}
+
+
+/* Director · WhatsApp live stream */
+.admin-wa-stream{display:grid;gap:7px;max-height:430px;overflow:auto;padding:4px 2px 2px;scrollbar-width:thin}
+.admin-wa-line{border:1px solid #202631;border-radius:10px;background:#10151d;padding:9px 10px}
+.admin-wa-line>div{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.admin-wa-line b{font-size:10px;color:#e8edf5}
+.admin-wa-line small{font-size:8px;color:#687487;text-align:right}
+.admin-wa-line p{margin:6px 0 0;color:#aeb8c8;font-size:10px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}
+.admin-wa-line.out{border-left:3px solid #506176}
+.admin-wa-line.in{border-left:3px solid #36a884}
