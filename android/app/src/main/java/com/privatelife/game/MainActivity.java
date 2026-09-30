@@ -27,6 +27,13 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.FirebaseOptions;
+import com.google.firebase.messaging.FirebaseMessaging;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 public class MainActivity extends Activity {
 
     private static final String START_URL = "https://private-life-04pu.onrender.com/";
@@ -37,6 +44,8 @@ public class MainActivity extends Activity {
     private static final String NATIVE_PREFS = "private_life_native";
     private static final String PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked";
     private static final String NOTIFICATION_CHANNEL_ID = "private_life_events";
+    private static final String PREF_PUSH_TOKEN = "push_token";
+    private static final String PREF_PENDING_PUSH = "pending_push";
 
     private WebView webView;
     private ValueCallback<Uri[]> pendingFileCallback;
@@ -51,6 +60,7 @@ public class MainActivity extends Activity {
         enableImmersiveMode();
         createNotificationChannel();
         requestNotificationPermissionOnFirstLaunch();
+        initializeFirebasePush();
 
         webView = new WebView(this);
         webView.setBackgroundColor(Color.rgb(8, 9, 13));
@@ -105,6 +115,90 @@ public class MainActivity extends Activity {
                 new String[]{Manifest.permission.POST_NOTIFICATIONS},
                 NOTIFICATION_PERMISSION_REQUEST
         );
+    }
+
+    private void initializeFirebasePush() {
+        String apiKey = getString(R.string.firebase_api_key).trim();
+        String appId = getString(R.string.firebase_app_id).trim();
+        String projectId = getString(R.string.firebase_project_id).trim();
+        String senderId = getString(R.string.firebase_gcm_sender_id).trim();
+
+        if (apiKey.isEmpty() || appId.isEmpty() || projectId.isEmpty() || senderId.isEmpty()) {
+            return;
+        }
+
+        try {
+            if (FirebaseApp.getApps(this).isEmpty()) {
+                FirebaseOptions options = new FirebaseOptions.Builder()
+                        .setApiKey(apiKey)
+                        .setApplicationId(appId)
+                        .setProjectId(projectId)
+                        .setGcmSenderId(senderId)
+                        .build();
+                FirebaseApp.initializeApp(this, options);
+            }
+
+            FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+                if (!task.isSuccessful() || task.getResult() == null) {
+                    return;
+                }
+
+                getSharedPreferences(NATIVE_PREFS, MODE_PRIVATE)
+                        .edit()
+                        .putString(PREF_PUSH_TOKEN, task.getResult())
+                        .apply();
+
+                syncNativePushWithPage();
+            });
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void syncNativePushWithPage() {
+        if (webView == null) {
+            return;
+        }
+
+        String token = getSharedPreferences(NATIVE_PREFS, MODE_PRIVATE)
+                .getString(PREF_PUSH_TOKEN, "");
+
+        if (token != null && !token.trim().isEmpty()) {
+            String js =
+                    "(function(){var token=" + JSONObject.quote(token) + ";"
+                    + "window.__PRIVATE_LIFE_PUSH_TOKEN__=token;"
+                    + "window.dispatchEvent(new CustomEvent('private-life:native-push-token',{detail:{token:token}}));"
+                    + "})();";
+            webView.evaluateJavascript(js, null);
+        }
+
+        String raw = getSharedPreferences(NATIVE_PREFS, MODE_PRIVATE)
+                .getString(PREF_PENDING_PUSH, "[]");
+
+        try {
+            JSONArray pending = new JSONArray(raw == null ? "[]" : raw);
+            if (pending.length() == 0) {
+                return;
+            }
+
+            getSharedPreferences(NATIVE_PREFS, MODE_PRIVATE)
+                    .edit()
+                    .putString(PREF_PENDING_PUSH, "[]")
+                    .apply();
+
+            for (int i = pending.length() - 1; i >= 0; i--) {
+                JSONObject detail = pending.optJSONObject(i);
+                if (detail == null) {
+                    continue;
+                }
+
+                String js =
+                        "window.dispatchEvent(new CustomEvent('private-life:notify',{detail:"
+                        + detail.toString()
+                        + "}));";
+                webView.evaluateJavascript(js, null);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private void configureWebView() {
@@ -221,6 +315,7 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 injectNativeFullscreenFix();
+                syncNativePushWithPage();
                 CookieManager.getInstance().flush();
             }
 
@@ -324,6 +419,7 @@ public class MainActivity extends Activity {
         super.onResume();
         enableImmersiveMode();
         if (webView != null) {
+            syncNativePushWithPage();
             webView.onResume();
         }
     }
