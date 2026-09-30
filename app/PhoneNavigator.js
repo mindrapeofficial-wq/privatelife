@@ -11,6 +11,11 @@ export default function PhoneNavigator(){
       if(label.includes('contactos')){
         event.preventDefault();
         window.location.href='/contactos';
+        return;
+      }
+      if(label.includes('notas')){
+        event.preventDefault();
+        window.location.href='/notas';
       }
     };
     document.addEventListener('click',handler);
