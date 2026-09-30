@@ -67,7 +67,15 @@ function appKey(value=''){
   return key;
 }
 function glyph(app){return appGlyphs[appKey(app)]||String(app||'P').trim().slice(0,2).toUpperCase()}
-function iconFor(app){return appIcons[appKey(app)]||''}
+function domIconFor(app){
+  if(typeof document==='undefined')return '';
+  const key=appKey(app);
+  const buttons=[...document.querySelectorAll('.phone .ios-app')];
+  const button=buttons.find(node=>appKey(node.dataset.appName||node.dataset.appId||node.textContent)===key);
+  const image=button?.querySelector('img.ios-appicon');
+  return image?.src||'';
+}
+function iconFor(app){return domIconFor(app)||appIcons[appKey(app)]||''}
 
 export default function PhoneNotifications(){
   const [target,setTarget]=useState(null);
@@ -191,7 +199,7 @@ export default function PhoneNotifications(){
       const item={
         id:detail.id||crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,
         app:String(detail.app||'PRIVATE LIFE'),title:String(detail.title||detail.app||'PRIVATE LIFE'),
-        body:prefs.previews===false?'':String(detail.body||detail.message||''),icon:detail.icon||'',href:detail.href||'',
+        body:prefs.previews===false?'':String(detail.body||detail.message||''),icon:detail.icon||domIconFor(detail.app)||'',href:detail.href||'',
         createdAt:detail.createdAt||new Date().toISOString(),read:false,priority:detail.priority||'normal',
         data:detail.data&&typeof detail.data==='object'?detail.data:{}
       };
@@ -259,9 +267,9 @@ export default function PhoneNotifications(){
     markRead(item.id);setBanner(null);setShade(false);
     window.dispatchEvent(new CustomEvent('private-life:notification-open',{detail:item}));
     if(item.href){if(item.href.startsWith('/'))location.href=item.href;return}
-    const wanted=normalize(item.app);
-    const apps=[...document.querySelectorAll('.phone .app')];
-    const app=apps.find(a=>{const label=normalize(a.textContent);return label&&(wanted.includes(label)||label.includes(wanted))});
+    const wanted=appKey(item.app);
+    const apps=[...document.querySelectorAll('.phone .ios-app')];
+    const app=apps.find(a=>appKey(a.dataset.appName||a.dataset.appId||a.textContent)===wanted);
     if(app)setTimeout(()=>app.click(),80);
   }
   function clearAll(){setItems([]);setBanner(null)}
