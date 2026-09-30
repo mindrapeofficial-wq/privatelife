@@ -315,6 +315,16 @@ export default function AdminPage(){
         title:'La IA reajustó una relación',
         text:(x.name||x.id||'Personaje')+' · '+(Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · ')||'sin variaciones numéricas')
       }));
+      (plan.socialActions||[]).forEach((x,i)=>push({
+        id:'ai-social:'+run.id+':'+i,kind:'ai',source:'IA · SOCIAL',at:run.createdAt||run.gameAt,
+        title:'La IA actuó sobre la red NPC',
+        text:[x.actorKey&&x.targetKey?(x.actorKey+' ↔ '+x.targetKey):null,x.summary||x.type,Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · ')].filter(Boolean).join(' · ')
+      }));
+      (plan.informationActions||[]).forEach((x,i)=>push({
+        id:'ai-info:'+run.id+':'+i,kind:'ai',source:'IA · INFORMACIÓN',at:run.createdAt||run.gameAt,
+        title:x.action==='share'?'La IA permitió circular información':'La IA registró información social',
+        text:[x.infoKey,x.content||x.summary||x.reason,x.fromKey&&x.toKey?(x.fromKey+' → '+x.toKey):null].filter(Boolean).join(' · ')
+      }));
       (plan.events||[]).forEach((x,i)=>push({
         id:'ai-event:'+run.id+':'+i,kind:'ai',source:'IA · PLAN',at:run.createdAt||run.gameAt,
         title:'La IA programó un evento',
