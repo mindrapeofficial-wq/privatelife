@@ -100,6 +100,7 @@ export default function AdminPage(){
   const [player,setPlayer]=useState(null),[tab,setTab]=useState('overview'),[charId,setCharId]=useState('');
   const [eventDraft,setEventDraft]=useState(''),[chatDraft,setChatDraft]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[aiHealth,setAiHealth]=useState(null),[aiHealthBusy,setAiHealthBusy]=useState(false);
   const [aiMind,setAiMind]=useState(null),[aiMindBusy,setAiMindBusy]=useState(false),[aiMindSelectedRun,setAiMindSelectedRun]=useState('');
+  const [consoleFilter,setConsoleFilter]=useState('all'),[consoleQuery,setConsoleQuery]=useState('');
   const [chat,setChat]=useState([{role:'ai',text:'Director IA central conectado. Puedo analizar la partida y usar las herramientas narrativas del panel cuando me lo pidas.'}]);
 
   async function loadUsers(preferred){
@@ -183,6 +184,7 @@ export default function AdminPage(){
   useEffect(()=>{if(selectedId)loadPlayer(selectedId)},[selectedId]);
   useEffect(()=>{if(tab!=='phone'||!selectedId)return;refreshPhone(selectedId);const id=setInterval(()=>refreshPhone(selectedId),2000);return()=>clearInterval(id)},[tab,selectedId]);
   useEffect(()=>{if(tab!=='mind'||!selectedId)return;loadAiMind(selectedId);const id=setInterval(()=>loadAiMind(selectedId,{quiet:true}),5000);return()=>clearInterval(id)},[tab,selectedId]);
+  useEffect(()=>{if(tab!=='console'||!selectedId)return;const tick=()=>{refreshPhone(selectedId);loadAiMind(selectedId,{quiet:true})};tick();const id=setInterval(tick,2000);return()=>clearInterval(id)},[tab,selectedId]);
 
   const save=player?.save?world(player.save):world({});
   const chars=save.world.characters,events=save.world.events;
@@ -195,6 +197,103 @@ export default function AdminPage(){
   const aiRun=aiRuns.find(r=>String(r.id)===String(aiMindSelectedRun))||aiRuns[0]||null;
   const aiPlan=aiRun?.plan||aiMind?.state?.lastPlan||{};
   const aiActionCount=(aiPlan.newCharacters?.length||0)+(aiPlan.characterUpdates?.length||0)+(aiPlan.relationshipUpdates?.length||0)+(aiPlan.events?.length||0)+(aiPlan.messages?.length||0);
+  const consoleEntries=useMemo(()=>{
+    const out=[];
+    const push=(entry)=>{if(entry?.at)out.push({...entry,at:entry.at})};
+    const playerName=save.identity?.name||'El jugador';
+
+    phoneActivity.forEach(ev=>push({
+      id:'phone:'+ev.id,kind:'player',source:'TELÉFONO',at:ev.createdAt,
+      title:phoneEventText(ev),
+      text:ev?.data?.app?playerName+' está usando '+ev.data.app+'.':ev?.label?playerName+' realizó esta acción en el teléfono.':'Actividad registrada en el teléfono del jugador.'
+    }));
+
+    phoneWhatsapp.forEach(m=>push({
+      id:'wa:'+m.id,kind:'message',source:'WHATSAPP',at:m.createdAt,
+      title:m.side==='out'?playerName+' escribió a '+(m.contactName||'un contacto'):(m.contactName||'Un contacto')+' escribió al jugador',
+      text:m.type==='image'?'Envió una foto.':String(m.text||'Mensaje sin texto'),
+      meta:m.side==='out'?'JUGADOR → CONTACTO':'CONTACTO → JUGADOR'
+    }));
+
+    lifeEvents.forEach(ev=>push({
+      id:'life-event:'+ev.id,kind:'world',source:'MUNDO',at:ev.deliveredAt||ev.createdAt||ev.scheduledGameAt,
+      title:ev.status==='delivered'?'Ocurrió un evento del mundo':'Evento del mundo · '+String(ev.status||'pendiente'),
+      text:[ev.title,ev.body].filter(Boolean).join(' · ')||String(ev.type||'Evento narrativo'),
+      meta:ev.app?String(ev.app).toUpperCase():'LIFE ENGINE'
+    }));
+
+    lifeAutonomyEvents.forEach(ev=>push({
+      id:'autonomy:'+ev.id,kind:'world',source:'NPC',at:ev.createdAt||ev.gameAt,
+      title:(ev.characterName||'Un personaje')+' actuó por iniciativa propia',
+      text:String(ev.data?.summary||ev.data?.text||ev.data?.reason||ev.type||'Acción autónoma del personaje.'),
+      meta:'AUTONOMÍA NPC'
+    }));
+
+    events.forEach(ev=>push({
+      id:'world-save:'+ev.id,kind:'world',source:'EVENTO',at:ev.createdAt,
+      title:'Evento narrativo '+String(ev.status||'pendiente'),
+      text:String(ev.description||'Evento sin descripción'),
+      meta:String(ev.trigger||'manual').toUpperCase()
+    }));
+
+    (save.world?.directorLog||[]).forEach(log=>push({
+      id:'director:'+log.id,kind:'system',source:'ADMIN',at:log.at,
+      title:'Intervención del Director',
+      text:String(log.text||'Cambio realizado desde el panel de administración.')
+    }));
+
+    aiRuns.forEach(run=>{
+      push({
+        id:'ai-run:'+run.id,kind:'ai',source:'IA CENTRAL',at:run.createdAt||run.gameAt,
+        title:'La IA central revisó el mundo',
+        text:String(run.summary||'Revisión completada sin resumen.'),
+        meta:(run.queuedEvents||0)+' eventos · '+(run.queuedMessages||0)+' mensajes'
+      });
+      (run.observations||[]).forEach((x,i)=>push({
+        id:'ai-ob:'+run.id+':'+i,kind:'ai',source:'IA · OBSERVACIÓN',at:run.createdAt||run.gameAt,
+        title:'La IA detectó algo relevante',
+        text:String(x)
+      }));
+      (run.directorNotes||[]).forEach((x,i)=>push({
+        id:'ai-note:'+run.id+':'+i,kind:'ai',source:'IA · CRITERIO',at:run.createdAt||run.gameAt,
+        title:'Criterio operativo de la IA',
+        text:String(x)
+      }));
+      const plan=run.plan||{};
+      (plan.newCharacters||[]).forEach((x,i)=>push({
+        id:'ai-char:'+run.id+':'+i,kind:'ai',source:'IA · ACCIÓN',at:run.createdAt||run.gameAt,
+        title:'La IA decidió introducir a '+(x.name||'un nuevo personaje'),
+        text:String(x.role||x.occupation||'Nuevo personaje generado para el mundo.')
+      }));
+      (plan.characterUpdates||[]).forEach((x,i)=>push({
+        id:'ai-cupdate:'+run.id+':'+i,kind:'ai',source:'IA · ACCIÓN',at:run.createdAt||run.gameAt,
+        title:'La IA actualizó a '+(x.name||x.id||'un personaje'),
+        text:Object.keys(x.patch||{}).length?'Cambió: '+Object.keys(x.patch||{}).join(', '):'Actualizó su estado narrativo.'
+      }));
+      (plan.relationshipUpdates||[]).forEach((x,i)=>push({
+        id:'ai-rel:'+run.id+':'+i,kind:'ai',source:'IA · RELACIÓN',at:run.createdAt||run.gameAt,
+        title:'La IA reajustó una relación',
+        text:(x.name||x.id||'Personaje')+' · '+(Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · ')||'sin variaciones numéricas')
+      }));
+      (plan.events||[]).forEach((x,i)=>push({
+        id:'ai-event:'+run.id+':'+i,kind:'ai',source:'IA · PLAN',at:run.createdAt||run.gameAt,
+        title:'La IA programó un evento',
+        text:[x.title||x.type,x.reason||x.body,x.delayMinutes!=null?'dentro de '+x.delayMinutes+' min':null].filter(Boolean).join(' · ')
+      }));
+      (plan.messages||[]).forEach((x,i)=>push({
+        id:'ai-msg:'+run.id+':'+i,kind:'ai',source:'IA · PLAN',at:run.createdAt||run.gameAt,
+        title:'La IA programó un mensaje de '+(x.contactName||'un contacto'),
+        text:[x.reason||x.text,x.delayMinutes!=null?'dentro de '+x.delayMinutes+' min':null].filter(Boolean).join(' · ')
+      }));
+    });
+
+    return out.sort((a,b)=>new Date(b.at).getTime()-new Date(a.at).getTime()).slice(0,900);
+  },[phoneActivity,phoneWhatsapp,lifeEvents,lifeAutonomyEvents,events,save.world?.directorLog,save.identity?.name,aiRuns]);
+  const visibleConsoleEntries=useMemo(()=>{
+    const q=consoleQuery.trim().toLowerCase();
+    return consoleEntries.filter(x=>(consoleFilter==='all'||x.kind===consoleFilter)&&(!q||[x.source,x.title,x.text,x.meta].some(v=>String(v||'').toLowerCase().includes(q))));
+  },[consoleEntries,consoleFilter,consoleQuery]);
+  const aiOperationalState=aiMindBusy?'ANALIZANDO AHORA':aiMind?.state?'OBSERVANDO / EN ESPERA':'SIN CICLO TODAVÍA';
 
   function localEdit(fn){
     if(!player)return;
@@ -351,7 +450,7 @@ export default function AdminPage(){
       <header className="admin-header"><div><small>CONSOLA DEL DIRECTOR</small><h1>{player?(save.identity?.name||'@'+player.username):'Selecciona una partida'}</h1></div><div className="admin-status"><i/> ADMIN ACTIVO</div></header>
       {notice&&<div className="admin-notice">{notice}</div>}
       {!player?<div className="admin-empty large">Selecciona un jugador para empezar.</div>:<>
-        <nav className="admin-tabs">{[['overview','Resumen'],['phone','Teléfono'],['mind','Mente IA'],['characters','Personajes'],['events','Eventos'],['director','Director IA']].map(([k,l])=><button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>{l}</button>)}</nav>
+        <nav className="admin-tabs">{[['overview','Resumen'],['console','Consola viva'],['phone','Teléfono'],['mind','Mente IA'],['characters','Personajes'],['events','Eventos'],['director','Director IA']].map(([k,l])=><button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>{l}</button>)}</nav>
 
         {tab==='overview'&&<div className="admin-grid">
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>ESTADO DE PARTIDA</span><button onClick={()=>loadPlayer(player.id)}>Actualizar</button></div><div className="admin-kpis"><div><b>{chars.length}</b><span>Personajes</span></div><div><b>{events.filter(x=>x.status!=='cerrado').length}</b><span>Eventos abiertos</span></div><div><b>{Object.keys(save.profile||{}).length}</b><span>Variables</span></div></div></section>
@@ -359,6 +458,42 @@ export default function AdminPage(){
           <section className="admin-card"><div className="admin-card-head"><span>ACTIVIDAD</span></div><dl className="admin-dl"><div><dt>Último acceso</dt><dd>{fmt(player.lastLoginAt)}</dd></div><div><dt>Último guardado</dt><dd>{fmt(player.updatedAt)}</dd></div><div><dt>Alta</dt><dd>{fmt(player.createdAt)}</dd></div></dl></section>
           <section className="admin-card"><div className="admin-card-head"><span>CONTEXTO VIVO</span></div><dl className="admin-dl"><div><dt>Zona geográfica</dt><dd>{worldLocation?.display_label||'—'}</dd></div><div><dt>Lugar actual</dt><dd>{playerContext?.location_label||'—'}</dd></div><div><dt>Actividad</dt><dd>{playerContext?.activity_label||'—'}</dd></div><div><dt>Disponibilidad</dt><dd>{playerContext?.availability||'—'}</dd></div><div><dt>Eventos Scheduler</dt><dd>{lifeEvents.filter(e=>e.status==='pending').length} pendientes</dd></div></dl></section>
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>VARIABLES OCULTAS DEL JUGADOR</span><button disabled={busy} onClick={()=>persist(save,'Variables del jugador ajustadas')}>Guardar</button></div><div className="admin-traits">{Object.entries(save.profile||{}).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=><label key={k}><span>{k.replaceAll('_',' ')}</span><input type="range" min="0" max="100" value={Number(v)||0} onChange={e=>localEdit(next=>{next.profile={...(next.profile||{}),[k]:Number(e.target.value)}})}/><b>{Number(v)||0}</b></label>)}{!Object.keys(save.profile||{}).length&&<div className="admin-empty">El jugador todavía no ha completado su perfil.</div>}</div></section>
+        </div>}
+
+        {tab==='console'&&<div className="admin-console-live">
+          <section className="admin-card admin-console-hero">
+            <div className="admin-card-head"><span>CONSOLA VIVA · @{player.username}</span><div className="admin-live-pill live"><i/>ACTUALIZACIÓN · 2 S</div></div>
+            <div className="admin-console-state">
+              <div className="admin-console-brain"><small>IA CENTRAL AHORA</small><b>{aiOperationalState}</b><p>{aiMindBusy?'Está leyendo el estado del mundo y preparando una decisión estructurada.':aiMind?.state?.lastSummary||'La IA está a la espera de su primer ciclo autónomo.'}</p></div>
+              <div><small>PRÓXIMA REVISIÓN</small><b>{fmt(aiMind?.state?.nextRunGameAt)}</b></div>
+              <div><small>ENTRADAS CARGADAS</small><b>{consoleEntries.length}</b></div>
+              <div><small>JUGADOR</small><b>{playerContext?.activity_label||phoneState.currentApp||'Sin actividad declarada'}</b></div>
+            </div>
+            <div className="admin-console-explainer">La consola traduce a lenguaje humano las señales registradas por el juego: acciones del jugador, mensajes, eventos, autonomía de NPC, intervenciones del admin y decisiones resumidas de la IA central.</div>
+          </section>
+
+          <section className="admin-card admin-console-stream-card">
+            <div className="admin-console-toolbar">
+              <div className="admin-console-filters">
+                {[['all','Todo'],['player','Jugador'],['message','Mensajes'],['world','Mundo'],['ai','IA'],['system','Sistema']].map(([k,l])=><button key={k} className={consoleFilter===k?'active':''} onClick={()=>setConsoleFilter(k)}>{l}</button>)}
+              </div>
+              <input value={consoleQuery} onChange={e=>setConsoleQuery(e.target.value)} placeholder="Buscar persona, mensaje, evento, app, criterio…"/>
+            </div>
+            <div className="admin-console-stream">
+              {visibleConsoleEntries.map(entry=><article className={'admin-console-entry '+entry.kind} key={entry.id}>
+                <div className="admin-console-rail"><i/><span/></div>
+                <div className="admin-console-copy">
+                  <header><span>{entry.source}</span><time>{fmt(entry.at)}</time></header>
+                  <b>{entry.title}</b>
+                  <p>{entry.text}</p>
+                  {entry.meta&&<small>{entry.meta}</small>}
+                </div>
+              </article>)}
+              {!visibleConsoleEntries.length&&<div className="admin-empty large">No hay entradas que coincidan con este filtro. En cuanto ocurra algo, aparecerá aquí automáticamente.</div>}
+            </div>
+          </section>
+
+          <div className="admin-ai-disclaimer">“Qué analiza la IA” se representa mediante observaciones, criterios, planes y resúmenes auditables. No se muestra razonamiento interno privado paso a paso.</div>
         </div>}
 
         {tab==='phone'&&<div className="admin-phone-layout">
