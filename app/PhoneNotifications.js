@@ -8,6 +8,7 @@ const INTRO='private-life-notifications-intro-v1';
 const PHONE_SETTINGS='private-life-phone-settings-v1';
 const CONTACTS='private-life-contacts';
 const STORY='private-life-narrative-events-v1';
+const MESSAGE_INBOX='private-life-messages-v1';
 const MAX_NOTIFICATIONS=60;
 
 const appGlyphs={
@@ -76,6 +77,20 @@ function domIconFor(app){
   return image?.src||'';
 }
 function iconFor(app){return domIconFor(app)||appIcons[appKey(app)]||''}
+function persistOfficialMessage(item){
+  if(typeof localStorage==='undefined'||appKey(item?.app)!=='mensajes')return;
+  try{
+    const existing=JSON.parse(localStorage.getItem(MESSAGE_INBOX)||'{}');
+    const store={admin:Array.isArray(existing?.admin)?existing.admin:[],updates:Array.isArray(existing?.updates)?existing.updates:[]};
+    const payload=item?.data?.payload||{};
+    const haystack=normalize([item?.title,item?.body,item?.data?.eventType,payload?.source,payload?.thread].filter(Boolean).join(' '));
+    const thread=(haystack.includes('actualiza')||haystack.includes('version')||haystack.includes('novedad')||haystack.includes('mantenimiento')||haystack.includes('patch'))?'updates':'admin';
+    const message={id:String(item.id),title:String(item.title||'PRIVATE LIFE').slice(0,160),text:String(item.body||'').slice(0,4000),createdAt:item.createdAt||new Date().toISOString(),read:false,source:String(payload?.source||item?.data?.source||'system'),thread};
+    if(!store[thread].some(entry=>entry?.id===message.id))store[thread]=[...store[thread],message].slice(-160);
+    localStorage.setItem(MESSAGE_INBOX,JSON.stringify(store));
+    window.dispatchEvent(new CustomEvent('private-life:messages-store',{detail:message}));
+  }catch{}
+}
 
 export default function PhoneNotifications(){
   const [target,setTarget]=useState(null);
@@ -217,6 +232,7 @@ export default function PhoneNotifications(){
         }
       });
       if(prefs.vibration!==false&&detail.vibrate!==false&&navigator.vibrate)navigator.vibrate([42,28,42]);
+      persistOfficialMessage(item);
       window.dispatchEvent(new CustomEvent('private-life:notification-received',{detail:item}));
     };
     window.privateLifeNotify=notify;
@@ -228,6 +244,19 @@ export default function PhoneNotifications(){
       return()=>{clearTimeout(t);window.removeEventListener('private-life:notify',handler);delete window.privateLifeNotify};
     }
     return()=>{window.removeEventListener('private-life:notify',handler);delete window.privateLifeNotify};
+  },[]);
+
+  useEffect(()=>{
+    const handler=e=>{
+      const ids=new Set(Array.isArray(e?.detail?.ids)?e.detail.ids.map(String):[]);
+      setItems(current=>current.map(item=>{
+        if(appKey(item.app)!=='mensajes')return item;
+        if(ids.size&&!ids.has(String(item.id)))return item;
+        return item.read?item:{...item,read:true};
+      }));
+    };
+    window.addEventListener('private-life:messages-read',handler);
+    return()=>window.removeEventListener('private-life:messages-read',handler);
   },[]);
 
   useEffect(()=>{try{localStorage.setItem(STORAGE,JSON.stringify(items))}catch{}},[items]);
