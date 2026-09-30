@@ -1,0 +1,32 @@
+CREATE SCHEMA IF NOT EXISTS private_life;
+
+CREATE TABLE IF NOT EXISTS private_life.users (
+  id BIGSERIAL PRIMARY KEY,
+  username TEXT NOT NULL,
+  username_key TEXT NOT NULL UNIQUE,
+  password_salt TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_login_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS private_life.sessions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES private_life.users(id) ON DELETE CASCADE,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS private_life_sessions_user_id_idx
+  ON private_life.sessions(user_id);
+
+CREATE INDEX IF NOT EXISTS private_life_sessions_expires_at_idx
+  ON private_life.sessions(expires_at);
+
+CREATE TABLE IF NOT EXISTS private_life.game_saves (
+  user_id BIGINT PRIMARY KEY REFERENCES private_life.users(id) ON DELETE CASCADE,
+  save_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
