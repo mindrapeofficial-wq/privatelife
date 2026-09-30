@@ -75,6 +75,15 @@
 .home-page{width:50%;flex:0 0 50%;padding:52px 18px 0}.second-page{padding-top:46px}
 .ios-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:26px 10px;align-items:start}.compact-grid{margin-top:26px}
 .ios-app{appearance:none;background:transparent!important;color:white!important;border:0!important;border-radius:0!important;padding:0!important;letter-spacing:0!important;font-weight:500!important;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.ios-app{position:relative}
+.home-editing .ios-app.editing{animation:appJiggle .14s ease-in-out infinite alternate;transform-origin:50% 45%}
+.home-editing .ios-app.editing:nth-child(2n){animation-direction:alternate-reverse;animation-duration:.16s}
+@keyframes appJiggle{from{transform:rotate(-1.7deg) translateY(.4px)}to{transform:rotate(1.7deg) translateY(-.4px)}}
+.app-delete-badge{position:absolute;z-index:6;top:-8px;left:calc(50% - 39px);width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#e9e9eb;color:#343438;border:1px solid #c5c6ca;box-shadow:0 1px 4px #0005;font-size:22px;font-weight:500;line-height:20px;text-shadow:none}
+.dock-app .app-delete-badge{top:-9px;left:calc(50% - 39px)}
+.home-edit-done{position:absolute;z-index:30;right:16px;top:51px;border:0!important;border-radius:17px!important;background:#f2f2f7e8!important;color:#087cff!important;padding:6px 12px!important;font-size:12px!important;font-weight:800!important;letter-spacing:0!important;text-transform:none!important;backdrop-filter:blur(18px);box-shadow:0 2px 8px #0003}
+.home-editing .ios-app:active .ios-appicon{transform:none;filter:drop-shadow(0 2px 4px #0005)}
+
 .ios-app:active .ios-appicon{transform:scale(.86);filter:brightness(.78)}
 .ios-appicon{width:62px;height:62px;border-radius:15px;object-fit:contain;display:grid;place-items:center;transition:transform .12s ease,filter .12s ease;filter:drop-shadow(0 2px 4px #0005)}
 .ios-label{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:14px;text-shadow:0 1px 3px #000,0 0 6px #000b}
