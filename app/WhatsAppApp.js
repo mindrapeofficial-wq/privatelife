@@ -22,7 +22,7 @@ function groupMessages(contacts,messages,previous={}){
  });
  return out;
 }
-function contactPayload(c){return {id:c.id,name:c.name,age:c.age,city:c.city,relationshipType:c.relationshipType,relation:c.relation,affection:c.affection,profile:c.profile,engineContext:c.engineContext,masterSheet:c.masterSheet}}
+function contactPayload(c){return {id:c.id,name:c.name,age:c.age,city:c.city,relationshipType:c.relationshipType,relation:c.relation,affection:c.affection,profile:c.profile,engineContext:c.engineContext,masterSheet:c.masterSheet,npcId:c.npcId||null,npcConfigSnapshot:c.npcConfigSnapshot||null}}
 async function api(url,options={}){
  const response=await fetch(url,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});
  let data={};try{data=await response.json()}catch{}
@@ -50,6 +50,7 @@ export default function WhatsAppApp({onClose}){
  const [typing,setTyping]=useState(false);
  const [ready,setReady]=useState(false);
  const [online,setOnline]=useState(true);
+ const [lifeStates,setLifeStates]=useState({});
  const endRef=useRef(null),fileRef=useRef(null),mounted=useRef(true);
 
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[]);
@@ -74,10 +75,24 @@ export default function WhatsAppApp({onClose}){
    }catch{}
  }
 
+ async function refreshLifeStates(){
+   try{
+     const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+     const data=await api('/api/life/npcs/status?timezone='+encodeURIComponent(timezone),{cache:'no-store'});
+     if(!mounted.current)return;
+     const map={};
+     for(const state of data.characters||[]){
+       if(state.contactKey)map[String(state.contactKey)]=state;
+       if(state.name)map['name:'+String(state.name).trim().toLowerCase()]=state;
+     }
+     setLifeStates(map);
+   }catch{}
+ }
+
  useEffect(()=>{
    const c=contactsFromStorage();setContacts(c);setChats(groupMessages(c,[]));setReady(true);
-   refreshMessages(c);pollDirector(c);
-   const sync=()=>{const next=contactsFromStorage();setContacts(next);refreshMessages(next);pollDirector(next)};
+   refreshMessages(c);pollDirector(c);refreshLifeStates();
+   const sync=()=>{const next=contactsFromStorage();setContacts(next);refreshMessages(next);pollDirector(next);refreshLifeStates()};
    window.addEventListener('storage',sync);window.addEventListener('private-life:contacts-changed',sync);
    return()=>{window.removeEventListener('storage',sync);window.removeEventListener('private-life:contacts-changed',sync)};
  },[]);
@@ -85,7 +100,8 @@ export default function WhatsAppApp({onClose}){
  useEffect(()=>{
    if(!ready)return;
    const id=setInterval(async()=>{await pollDirector();await refreshMessages()},5000);
-   return()=>clearInterval(id);
+   const lifeId=setInterval(()=>refreshLifeStates(),15000);
+   return()=>{clearInterval(id);clearInterval(lifeId)};
  },[ready,contacts]);
 
  useEffect(()=>{endRef.current?.scrollIntoView({behavior:'smooth'})},[chats,typing,activeId]);
@@ -114,6 +130,8 @@ export default function WhatsAppApp({onClose}){
      const data=await api('/api/whatsapp',{method:'POST',body:JSON.stringify({action:'send',contact:contactPayload(active),type,text,image})});
      storyEvent(active,type==='image'?'photo_sent':'message_sent',text?{text}:{});
      if(data.reply?.text)storyEvent(active,'message_received',{text:data.reply.text});
+     if(data.queued)storyEvent(active,'reply_delayed',{deliverAfter:data.deliverAfter||null,lifeState:data.lifeState||null});
+     if(data.lifeState)setLifeStates(prev=>({...prev,[String(active.id)]:data.lifeState}));
      await api('/api/whatsapp',{method:'POST',body:JSON.stringify({action:'read',contact:contactPayload(active)})}).catch(()=>{});
      await refreshMessages();
    }catch{
@@ -145,12 +163,14 @@ export default function WhatsAppApp({onClose}){
 
  if(active){
    const messages=chats[active.id]?.messages||[];
+   const life=lifeStates[String(active.id)]||lifeStates['name:'+String(active.name||'').trim().toLowerCase()]||null;
+   const presence=life?.label?String(life.label).charAt(0).toLowerCase()+String(life.label).slice(1):(online?'en línea':'conectando…');
    return <div className="whatsapp-app wa-thread">
      <header className="wa-chat-head">
        <button className="wa-back" onClick={()=>setActiveId(null)} aria-label="Volver">‹</button>
        <button className="wa-person">
          <Avatar contact={active} size="sm"/>
-         <span><b>{active.name}</b><small>{typing?'escribiendo…':online?'en línea':'conectando…'}</small></span>
+         <span><b>{active.name}</b><small>{typing?'escribiendo…':presence}</small></span>
        </button>
        <button className="wa-head-icon" aria-label="Videollamada">⌁</button>
        <button className="wa-head-icon" aria-label="Llamar">⌕</button>

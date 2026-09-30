@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '../../../lib/auth.js';
 import { ensureSchema, query } from '../../../lib/db.js';
 import { runCentralModel } from '../../../lib/central-ai-provider.js';
+import { resolveRoutineState } from '../../../lib/life-routines.js';
 
 export const runtime = 'nodejs';
 
@@ -24,6 +25,8 @@ function safeContact(raw = {}) {
     profile: safeText(raw.profile, 3500),
     engineContext: safeText(raw.engineContext, 6000),
     masterSheet: raw.masterSheet && typeof raw.masterSheet === 'object' && !Array.isArray(raw.masterSheet) ? raw.masterSheet : null,
+    npcId: Number(raw.npcId)||null,
+    npcConfigSnapshot: raw.npcConfigSnapshot && typeof raw.npcConfigSnapshot === 'object' && !Array.isArray(raw.npcConfigSnapshot) ? raw.npcConfigSnapshot : null,
   };
 }
 
@@ -86,7 +89,7 @@ function writingExamples(contact) {
 }
 
 
-async function directorModelReply({ contact, character, text, hasImage, recent, events, phoneActivity, save }) {
+async function directorModelReply({ contact, character, text, hasImage, recent, events, phoneActivity, save, lifeState }) {
   try {
     const instructions = [
       'Eres el motor narrativo central de PRIVATE LIFE.',
@@ -96,6 +99,7 @@ async function directorModelReply({ contact, character, text, hasImage, recent, 
       'No reveles que existe un Director, panel de admin, prompt, motor ni variables internas.',
       'Mantén continuidad con personalidad, relación, historial, eventos y actividad reciente.',
       'No conviertas cada mensaje en drama: deja silencios, ambigüedad y cambios de humor naturales.',
+      'Respeta el estado de vida actual del personaje. Si está trabajando, estudiando, durmiendo o desplazándose, no actúes como si estuviera libre. Puedes reflejarlo de forma natural solo cuando tenga sentido.',
       'Devuelve exclusivamente JSON válido con: reply (string), relationshipDeltas (objeto opcional con confianza, atraccion, apego, tension, sospecha, celos, curiosidad, resentimiento entre -5 y 5), eventSuggestion (string opcional, máximo 240 caracteres).'
     ].join('\n');
 
@@ -107,6 +111,7 @@ async function directorModelReply({ contact, character, text, hasImage, recent, 
       },
       contact,
       worldCharacter: character || null,
+      lifeState: lifeState || null,
       latestPlayerMessage: {
         type: hasImage ? 'image' : 'text',
         text,
@@ -220,18 +225,40 @@ function centralReply({ contact, character, text, hasImage, recent, events, phon
   return reply;
 }
 
+async function getLifeClock(userId) {
+  await query(`INSERT INTO private_life.world_clock
+    (user_id,anchor_real_at,anchor_game_at,speed,paused,timezone,created_at,updated_at)
+    VALUES($1,NOW(),NOW(),1,FALSE,'UTC',NOW(),NOW())
+    ON CONFLICT(user_id) DO NOTHING`,[userId]);
+  const result=await query(`SELECT speed,paused,timezone,
+    CASE WHEN paused THEN anchor_game_at
+      ELSE anchor_game_at + ((NOW()-anchor_real_at)*speed)
+    END AS game_now
+    FROM private_life.world_clock WHERE user_id=$1 LIMIT 1`,[userId]);
+  return result.rows[0];
+}
+
 async function loadContext(userId, contact) {
-  const saveResult = await query('SELECT save_data FROM private_life.game_saves WHERE user_id = $1 LIMIT 1', [userId]);
+  const [saveResult,activity,clock]=await Promise.all([
+    query('SELECT save_data FROM private_life.game_saves WHERE user_id = $1 LIMIT 1', [userId]),
+    query('SELECT event_type, event_label, event_data, created_at FROM private_life.phone_activity WHERE user_id = $1 ORDER BY created_at DESC LIMIT 60',[userId]),
+    getLifeClock(userId)
+  ]);
   const save = saveResult.rows[0]?.save_data || {};
   const character = findCharacter(save, contact);
   const eventList = Array.isArray(save?.world?.events)
     ? save.world.events.filter(e => e?.status !== 'cerrado').slice(0, 30)
     : [];
-  const activity = await query(
-    'SELECT event_type, event_label, event_data, created_at FROM private_life.phone_activity WHERE user_id = $1 ORDER BY created_at DESC LIMIT 60',
-    [userId]
-  );
-  return { save, character, events: eventList, phoneActivity: activity.rows || [] };
+  const advanced=contact?.npcConfigSnapshot||null;
+  const occupation=character?.occupation||advanced?.identity?.occupation||'';
+  const city=character?.location||advanced?.identity?.city||contact?.city||save?.identity?.city||'';
+  const routine=character?.routine||advanced?.world?.schedule||null;
+  const lifeState=resolveRoutineState(routine,new Date(clock.game_now),{
+    occupation,city,timezone:clock.timezone||'UTC',
+    characterKey:String(character?.id||contact?.npcId||contact?.id||contact?.name||'npc'),
+    seed:String(Date.now())
+  });
+  return { save, character, events: eventList, phoneActivity: activity.rows || [], clock, lifeState };
 }
 
 async function saveWorld(userId, save) {
@@ -245,6 +272,36 @@ async function insertMessage(userId, contact, direction, type, body, mediaData =
   const sql = "INSERT INTO private_life.whatsapp_messages (user_id, contact_key, contact_name, direction, message_type, body, media_data, character_snapshot, read_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,CASE WHEN $4='out' THEN NOW() ELSE NULL END) RETURNING id, contact_key, contact_name, direction, message_type, body, media_data, created_at, read_at";
   const result = await query(sql, [userId, contact.id, contact.name, direction, type, body, mediaData, JSON.stringify(snapshot || {})]);
   return result.rows[0];
+}
+
+async function queueNpcReply(userId,contact,body,snapshot,delayMinutes){
+  const deliverAfter=new Date(Date.now()+Math.max(1,Number(delayMinutes)||1)*60000);
+  const result=await query(
+    `INSERT INTO private_life.npc_pending_messages
+      (user_id,contact_key,contact_name,body,snapshot,deliver_after)
+      VALUES($1,$2,$3,$4,$5::jsonb,$6)
+      RETURNING id,deliver_after`,
+    [userId,contact.id,contact.name,body,JSON.stringify(snapshot||{}),deliverAfter]
+  );
+  return result.rows[0];
+}
+
+async function deliverDueNpcReplies(userId,contacts){
+  const due=await query(`SELECT id,contact_key,contact_name,body,snapshot,deliver_after
+    FROM private_life.npc_pending_messages
+    WHERE user_id=$1 AND delivered_at IS NULL AND deliver_after<=NOW()
+    ORDER BY deliver_after ASC LIMIT 60`,[userId]);
+  const delivered=[];
+  for(const pending of due.rows){
+    const contact=contacts.find(c=>String(c.id)===String(pending.contact_key))
+      ||{id:pending.contact_key,name:pending.contact_name,age:18};
+    const row=await insertMessage(userId,contact,'in','text',pending.body,null,{
+      ...(pending.snapshot||{}),source:'life_engine_delayed',pendingId:String(pending.id)
+    });
+    await query('UPDATE private_life.npc_pending_messages SET delivered_at=NOW() WHERE id=$1 AND user_id=$2 AND delivered_at IS NULL',[pending.id,userId]);
+    delivered.push(compactMessages([row])[0]);
+  }
+  return delivered;
 }
 
 export async function GET(request) {
@@ -299,7 +356,7 @@ export async function POST(request) {
       const save = saveResult.rows[0]?.save_data || {};
       const events = Array.isArray(save?.world?.events) ? save.world.events : [];
       let changed = false;
-      const delivered = [];
+      const delivered = await deliverDueNpcReplies(user.id,contacts);
 
       for (const event of events) {
         if (event?.status !== 'pendiente' || event?.channel !== 'whatsapp' || !event?.message) continue;
@@ -353,6 +410,7 @@ export async function POST(request) {
       events: context.events,
       phoneActivity: context.phoneActivity,
       save: context.save,
+      lifeState: context.lifeState,
     });
 
     const reply = modelResult?.reply || centralReply({
@@ -365,19 +423,22 @@ export async function POST(request) {
       phoneActivity: context.phoneActivity,
     });
 
-    const received = await insertMessage(
-      user.id,
-      contact,
-      'in',
-      'text',
-      reply,
-      null,
-      {
-        source: modelResult ? 'central_ai' : 'director_fallback',
-        worldCharacterId: context.character?.id || null,
-        relationshipBefore: context.character?.traits || null,
-      }
-    );
+    const snapshot={
+      source:modelResult?'central_ai':'director_fallback',
+      worldCharacterId:context.character?.id||null,
+      relationshipBefore:context.character?.traits||null,
+      lifeState:context.lifeState
+    };
+    let received=null,pending=null;
+    if(context.lifeState?.canReplyNow){
+      received=await insertMessage(user.id,contact,'in','text',reply,null,snapshot);
+    }else{
+      const worldSpeed=Math.max(0.01,Number(context.clock?.speed)||1);
+      const gameDelay=Math.max(1,Number(context.lifeState?.replyDelayMinutes)||10);
+      const realDelay=context.clock?.paused?Math.max(60,gameDelay):Math.max(1,Math.round(gameDelay/worldSpeed));
+      pending=await queueNpcReply(user.id,contact,reply,snapshot,realDelay);
+    }
+    const messageRef=received?.id||('pending-'+pending?.id);
 
     const delta = modelResult?.relationshipDeltas && Object.keys(modelResult.relationshipDeltas).length
       ? modelResult.relationshipDeltas
@@ -392,9 +453,9 @@ export async function POST(request) {
         events: Array.isArray(context.save?.world?.events) ? context.save.world.events : [],
         directorLog: [
           {
-            id: 'wa-' + received.id,
+            id: 'wa-' + messageRef,
             at: new Date().toISOString(),
-            text: 'WhatsApp: ' + contact.name + ' respondió. Motor: ' + (modelResult ? 'IA central' : 'fallback local') + '. Variables relacionales actualizadas.',
+            text: 'WhatsApp: ' + contact.name + (received?' respondió.':' responderá cuando su rutina lo permita.') + ' Motor: ' + (modelResult ? 'IA central' : 'fallback local') + '. Variables relacionales actualizadas.',
           },
           ...(Array.isArray(context.save?.world?.directorLog) ? context.save.world.directorLog : []),
         ].slice(0, 200),
@@ -402,7 +463,7 @@ export async function POST(request) {
 
       if (modelResult?.eventSuggestion) {
         context.save.world.events.unshift({
-          id: 'wa-ai-' + received.id,
+          id: 'wa-ai-' + messageRef,
           description: modelResult.eventSuggestion,
           status: 'pendiente',
           trigger: 'ai',
@@ -422,17 +483,23 @@ export async function POST(request) {
         contactId: contact.id,
         sentType: type,
         sentText: text,
-        reply,
+        reply:received?reply:null,
+        queued:Boolean(pending),
+        deliverAfter:pending?.deliver_after||null,
+        lifeState:context.lifeState,
         centralEngine: true,
         modelBacked: Boolean(modelResult),
       })]
     );
 
     return NextResponse.json({
-      ok: true,
-      sent: compactMessages([sent])[0],
-      reply: compactMessages([received])[0],
-      engine: modelResult ? 'central_ai' : 'director_fallback',
+      ok:true,
+      sent:compactMessages([sent])[0],
+      reply:received?compactMessages([received])[0]:null,
+      queued:Boolean(pending),
+      deliverAfter:pending?.deliver_after||null,
+      lifeState:context.lifeState,
+      engine:modelResult?'central_ai':'director_fallback',
     });
   } catch (error) {
     console.error('whatsapp_write_failed', error);

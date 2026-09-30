@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { buildDefaultRoutine, normalizeRoutine, routineSummary } from '../lib/life-routines.js';
 
 const CONTACTS_KEY='private-life-contacts';
 
@@ -45,7 +46,8 @@ const DEFAULT_CONFIG={
   },
   world:{
     routine:'',usualPlaces:'',friendsFamily:'',goals:'',fears:'',secrets:'',values:'',
-    hobbies:'',skills:'',financialSituation:'',dailyAvailability:''
+    hobbies:'',skills:'',financialSituation:'',dailyAvailability:'',
+    schedule:buildDefaultRoutine()
   },
   social:{
     discoverable:true,acceptContactRequests:true,canMessageOtherPlayers:true,
@@ -444,19 +446,86 @@ function MemorySection({c,patch}){const x=c.config.memory;return <>
   <div className="plai-isolation-note"><b>Memorias aisladas por jugador</b><span>Los recuerdos privados de una relación se almacenan en un estado separado y no se reutilizan en conversaciones con otros jugadores.</span></div>
 </>}
 
-function WorldSection({c,patch}){const x=c.config.world;return <Group title="Vida fuera de cámara" description="El personaje necesita una vida que no gire alrededor del jugador.">
-  <TextArea label="Rutina habitual" value={x.routine} onChange={v=>patch(['config','world','routine'],v)} placeholder="Trabajo, horarios, fines de semana…"/>
-  <TextArea label="Lugares habituales" value={x.usualPlaces} onChange={v=>patch(['config','world','usualPlaces'],v)}/>
-  <TextArea label="Familia y amistades" value={x.friendsFamily} onChange={v=>patch(['config','world','friendsFamily'],v)}/>
-  <TextArea label="Objetivos" value={x.goals} onChange={v=>patch(['config','world','goals'],v)}/>
-  <TextArea label="Miedos" value={x.fears} onChange={v=>patch(['config','world','fears'],v)}/>
-  <TextArea label="Secretos" value={x.secrets} onChange={v=>patch(['config','world','secrets'],v)}/>
-  <TextArea label="Valores" value={x.values} onChange={v=>patch(['config','world','values'],v)}/>
-  <TextArea label="Aficiones" value={x.hobbies} onChange={v=>patch(['config','world','hobbies'],v)}/>
-  <TextArea label="Habilidades" value={x.skills} onChange={v=>patch(['config','world','skills'],v)}/>
-  <TextArea label="Situación económica" value={x.financialSituation} onChange={v=>patch(['config','world','financialSituation'],v)}/>
-  <TextArea label="Disponibilidad diaria" value={x.dailyAvailability} onChange={v=>patch(['config','world','dailyAvailability'],v)} placeholder="Suele contestar después de las 18:00…"/>
-</Group>}
+function WorldSection({c,patch}){const x=c.config.world;return <>
+  <RoutineEditor c={c} patch={patch}/>
+  <Group title="Vida fuera de cámara" description="Contexto que completa la rutina estructurada y da profundidad a la vida del personaje.">
+    <TextArea label="Notas de rutina" value={x.routine} onChange={v=>patch(['config','world','routine'],v)} placeholder="Excepciones, costumbres, turnos especiales, fines de semana…"/>
+    <TextArea label="Lugares habituales" value={x.usualPlaces} onChange={v=>patch(['config','world','usualPlaces'],v)}/>
+    <TextArea label="Familia y amistades" value={x.friendsFamily} onChange={v=>patch(['config','world','friendsFamily'],v)}/>
+    <TextArea label="Objetivos" value={x.goals} onChange={v=>patch(['config','world','goals'],v)}/>
+    <TextArea label="Miedos" value={x.fears} onChange={v=>patch(['config','world','fears'],v)}/>
+    <TextArea label="Secretos" value={x.secrets} onChange={v=>patch(['config','world','secrets'],v)}/>
+    <TextArea label="Valores" value={x.values} onChange={v=>patch(['config','world','values'],v)}/>
+    <TextArea label="Aficiones" value={x.hobbies} onChange={v=>patch(['config','world','hobbies'],v)}/>
+    <TextArea label="Habilidades" value={x.skills} onChange={v=>patch(['config','world','skills'],v)}/>
+    <TextArea label="Situación económica" value={x.financialSituation} onChange={v=>patch(['config','world','financialSituation'],v)}/>
+    <TextArea label="Disponibilidad / excepciones" value={x.dailyAvailability} onChange={v=>patch(['config','world','dailyAvailability'],v)} placeholder="Ej.: los viernes suele desconectar antes; en época de exámenes tarda más…"/>
+  </Group>
+</>}
+
+const ROUTINE_DAYS=[['mon','L'],['tue','M'],['wed','X'],['thu','J'],['fri','V'],['sat','S'],['sun','D']];
+const ROUTINE_ACTIVITIES=['sleep','morning','commute','work','study','meal','personal','social','free','winding'];
+const ROUTINE_AVAILABILITY=[['offline','No disponible'],['busy','Ocupado/a'],['limited','Limitado/a'],['available','Disponible']];
+
+function RoutineEditor({c,patch}){
+  const identity=c.config.identity||{};
+  const routine=normalizeRoutine(c.config.world?.schedule,{occupation:identity.occupation,city:identity.city});
+  const [day,setDay]=useState('mon');
+  const summary=routineSummary(routine,{occupation:identity.occupation,city:identity.city});
+  const blocks=routine.days[day]||[];
+  const commit=next=>patch(['config','world','schedule'],next);
+  function blockPatch(index,key,value){
+    const next=clone(routine);
+    next.days[day]=next.days[day].map((block,i)=>i===index?{...block,[key]:value}:block);
+    commit(next);
+  }
+  function removeBlock(index){
+    const next=clone(routine);next.days[day]=next.days[day].filter((_,i)=>i!==index);commit(next);
+  }
+  function addBlock(){
+    const next=clone(routine);
+    const last=next.days[day].at(-1);
+    next.days[day].push({
+      id:'custom-'+Date.now(),start:last?.end||'18:00',end:'23:00',activity:'free',
+      label:'Disponible',location:identity.city||'',availability:'available',minReplyDelay:0,maxReplyDelay:3
+    });
+    commit(next);
+  }
+  function regenerate(){
+    const next=buildDefaultRoutine({occupation:identity.occupation,city:identity.city,timezone:routine.timezone});
+    commit(next);
+  }
+  return <Group title="Life Engine · Rutina estructurada" description="Esta agenda determina qué está haciendo el personaje y cuándo puede responder. El mundo la consulta incluso con el juego cerrado.">
+    <div className="plai-routine-top">
+      <Toggle label="Rutina activa" checked={routine.enabled} onChange={v=>commit({...routine,enabled:v})} description="Si se desactiva, el personaje se considera disponible."/>
+      <div className="plai-routine-summary">
+        <span><b>Preset</b>{summary.preset}</span><span><b>Actividad laboral</b>{summary.work}</span><span><b>Sueño</b>{summary.sleep}</span>
+      </div>
+      <div className="plai-form-grid">
+        <Field label="Zona horaria opcional" value={routine.timezone||''} onChange={v=>commit({...routine,timezone:v})} placeholder="Europe/Madrid"/>
+      </div>
+      <button type="button" className="plai-routine-generate" onClick={regenerate}>✦ Generar desde profesión y ciudad</button>
+    </div>
+    <div className="plai-routine-days">{ROUTINE_DAYS.map(([key,label])=><button type="button" key={key} className={day===key?'active':''} onClick={()=>setDay(key)}>{label}</button>)}</div>
+    <div className="plai-routine-blocks">
+      {blocks.map((block,index)=><div className="plai-routine-block" key={block.id||index}>
+        <div className="plai-routine-times">
+          <label><span>Desde</span><input type="time" value={block.start} onChange={e=>blockPatch(index,'start',e.target.value)}/></label>
+          <label><span>Hasta</span><input type="time" value={block.end==='24:00'?'23:59':block.end} onChange={e=>blockPatch(index,'end',e.target.value)}/></label>
+        </div>
+        <div className="plai-routine-fields">
+          <label><span>Actividad</span><select value={block.activity} onChange={e=>blockPatch(index,'activity',e.target.value)}>{ROUTINE_ACTIVITIES.map(v=><option key={v} value={v}>{v}</option>)}</select></label>
+          <label><span>Estado</span><select value={block.availability} onChange={e=>blockPatch(index,'availability',e.target.value)}>{ROUTINE_AVAILABILITY.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
+          <label><span>Etiqueta</span><input value={block.label||''} onChange={e=>blockPatch(index,'label',e.target.value)}/></label>
+          <label><span>Lugar</span><input value={block.location||''} onChange={e=>blockPatch(index,'location',e.target.value)}/></label>
+        </div>
+        <button type="button" className="plai-routine-remove" onClick={()=>removeBlock(index)}>Eliminar bloque</button>
+      </div>)}
+      {!blocks.length&&<div className="plai-empty">Este día no tiene bloques. El personaje se considerará disponible.</div>}
+      <button type="button" className="plai-routine-add" onClick={addBlock}>＋ Añadir bloque</button>
+    </div>
+  </Group>;
+}
 
 function SocialSection({c,patch}){const x=c.config.social;return <>
   <Group title="Interacción entre jugadores" description="Define cómo puede entrar este NPC en la vida de personas distintas a su creador.">

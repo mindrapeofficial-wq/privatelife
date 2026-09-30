@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { buildDefaultRoutine, routineSummary } from '../../lib/life-routines.js';
 
 const TRAITS=['confianza','atraccion','apego','tension','sospecha','celos','curiosidad','resentimiento'];
 
@@ -147,6 +148,7 @@ export default function AdminPage(){
   const chars=save.world.characters,events=save.world.events;
   const character=useMemo(()=>chars.find(x=>x.id===charId)||chars[0]||null,[chars,charId]);
   const phone=player?.phone||{state:{},activity:[],whatsapp:[],updatedAt:null},phoneState=phone.state||{},phoneActivity=Array.isArray(phone.activity)?phone.activity:[],phoneWhatsapp=Array.isArray(phone.whatsapp)?phone.whatsapp:[];
+  const life=player?.life||{characters:[],timezone:'UTC',speed:1,paused:false},lifeCharacters=Array.isArray(life.characters)?life.characters:[];
   const phoneFresh=phone.updatedAt&&Date.now()-new Date(phone.updatedAt).getTime()<12000&&phoneState.visibility!=='offline';
   const installedPhoneApps=['Instagram','WhatsApp','Facebook',...(save.datingApps?.tinder?['Tinder']:[]),...(save.datingApps?.grindr?['Grindr']:[]),'Contactos','Fotos','Calendario','App Store','Notas','Ajustes','Teléfono','Mensajes','Safari','Música'];
 
@@ -183,6 +185,7 @@ export default function AdminPage(){
     const traits=Object.fromEntries(TRAITS.map(t=>[t,bounded((archetype.traitBase[t]??50)+jitter(),3,96)]));
     const name=String(forcedName||'').trim()||pick(PROCEDURAL_NAMES);
     const secret=pick(archetype.secrets);
+    const occupation=pick(archetype.jobs);
     return {
       id:uid(),
       name,
@@ -190,8 +193,9 @@ export default function AdminPage(){
       status:'activo',
       origin:'procedural',
       role:pick(archetype.roles),
-      occupation:pick(archetype.jobs),
+      occupation,
       location,
+      routine:buildDefaultRoutine({occupation,city:city||location}),
       appearance:pick(PROCEDURAL_APPEARANCES),
       personality:archetype.personality,
       communication:archetype.communication,
@@ -227,7 +231,8 @@ export default function AdminPage(){
       || !String(c.communication||'').trim()
       || !String(c.objectives||'').trim()
       || !String(c.boundaries||'').trim()
-      || !String(c.secrets||'').trim();
+      || !String(c.secrets||'').trim()
+      || !c.routine;
   }
   async function completeCharacterProcedurally(){
     if(!character||!player)return;
@@ -345,7 +350,7 @@ export default function AdminPage(){
 
         {tab==='characters'&&<div className="admin-character-layout">
           <section className="admin-card admin-character-list"><div className="admin-card-head"><span>PERSONAJES</span><button disabled={busy} onClick={async()=>{const next=addCharacter();const created=next.world.characters[0];await persist(next,'Personaje procedural creado: '+created.name)}}>✦ Generar</button></div>
-            {chars.map(c=><button key={c.id} className={'admin-character-row '+(character?.id===c.id?'active':'')} onClick={()=>setCharId(c.id)}><span className="admin-avatar">{(c.name||'?').slice(0,1).toUpperCase()}</span><span><b>{c.name||'Sin nombre'}</b><small>{c.status||'activo'} · {c.origin||'procedural'}</small></span></button>)}
+            {chars.map(c=>{const live=lifeCharacters.find(x=>String(x.id)===String(c.id));return <button key={c.id} className={'admin-character-row '+(character?.id===c.id?'active':'')} onClick={()=>setCharId(c.id)}><span className="admin-avatar">{(c.name||'?').slice(0,1).toUpperCase()}</span><span><b>{c.name||'Sin nombre'}</b><small>{live?.label||c.status||'activo'} · {c.origin||'procedural'}</small></span></button>})}
             {!chars.length&&<div className="admin-empty">No hay NPC todavía. Pulsa “Generar” para crear una ficha procedural completa o pídeselo a Director IA.</div>}
           </section>
           <section className="admin-card admin-character-sheet">{!character?<div className="admin-empty large">Selecciona o crea un personaje.</div>:<>
@@ -358,6 +363,10 @@ export default function AdminPage(){
               <label>Rol narrativo<input value={character.role||''} onChange={e=>patchCharacter({role:e.target.value})}/></label>
               <label>Profesión<input value={character.occupation||''} onChange={e=>patchCharacter({occupation:e.target.value})}/></label>
               <label>Ubicación<input value={character.location||''} onChange={e=>patchCharacter({location:e.target.value})}/></label>
+            </div>
+            <div className="admin-routine-card">
+              <div><b>LIFE ENGINE · RUTINA</b><span>{(()=>{const live=lifeCharacters.find(x=>String(x.id)===String(character.id));return live?'Ahora: '+live.label+(live.location?' · '+live.location:''):'Estado pendiente de sincronización'})()}</span><span>Laboral: {routineSummary(character.routine,{occupation:character.occupation,city:character.location}).work} · Sueño: {routineSummary(character.routine,{occupation:character.occupation,city:character.location}).sleep}</span></div>
+              <button type="button" onClick={()=>patchCharacter({routine:buildDefaultRoutine({occupation:character.occupation,city:character.location})})}>✦ Regenerar rutina</button>
             </div>
             {[['appearance','Apariencia real / referencia visual'],['personality','Personalidad'],['communication','Forma de comunicarse'],['objectives','Objetivos'],['boundaries','Límites'],['secrets','Secretos'],['notes','Notas privadas del Director']].map(([k,l])=><label className="admin-textarea" key={k}>{l}<textarea value={character[k]||''} onChange={e=>patchCharacter({[k]:e.target.value})}/></label>)}
             <div className="admin-card-head sub"><span>PARÁMETROS</span></div><div className="admin-traits">{TRAITS.map(t=><label key={t}><span>{t}</span><input type="range" min="0" max="100" value={character.traits?.[t]??50} onChange={e=>patchTrait(t,e.target.value)}/><b>{character.traits?.[t]??50}</b></label>)}</div>
