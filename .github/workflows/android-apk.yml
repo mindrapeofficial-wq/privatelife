@@ -41,12 +41,12 @@ jobs:
         run: gradle -p android :app:assembleDebug --no-daemon
 
       - name: Name APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk Private-Life-v1.0.0.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Private-Life-v1.0.2.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Private-Life-v1.0.0
-          path: Private-Life-v1.0.0.apk
+          name: Private-Life-v1.0.2
+          path: Private-Life-v1.0.2.apk
           if-no-files-found: error
           retention-days: 30
