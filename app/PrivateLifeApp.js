@@ -475,7 +475,7 @@ function SocialSection({c,patch}){const x=c.config.social;return <>
   <Group title="Canales">
     <Toggle label="Private Life" checked={x.channels.privateLife} onChange={v=>patch(['config','social','channels','privateLife'],v)}/>
     <Toggle label="WhatsApp" checked={x.channels.whatsapp} onChange={v=>patch(['config','social','channels','whatsapp'],v)}/>
-    <Toggle label="Facebook" description="Facebook sigue reservado a jugadores reales; mantenlo desactivado." checked={x.channels.facebook} onChange={v=>patch(['config','social','channels','facebook'],v)}/>
+    <div className="plai-locked-channel"><b>Facebook</b><span>Reservado exclusivamente a jugadores reales. Los NPCs no crean perfiles aquí.</span></div>
     <TextArea label="Reglas sociales especiales" value={x.socialNotes} onChange={v=>patch(['config','social','socialNotes'],v)}/>
   </Group>
 </>}
