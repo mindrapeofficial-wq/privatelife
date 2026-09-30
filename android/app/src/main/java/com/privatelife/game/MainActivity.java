@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
             cookieManager.setAcceptThirdPartyCookies(webView, true);
         }
 
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
+        WebView.setWebContentsDebuggingEnabled(false);
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -164,7 +164,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        webView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
+        webView.setDownloadListener((url, downloadUserAgent, contentDisposition, mimetype, contentLength) -> {
             try {
                 startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
             } catch (Exception ignored) {
