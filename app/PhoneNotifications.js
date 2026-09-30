@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 const STORAGE='private-life-notifications-v1';
 const INTRO='private-life-notifications-intro-v1';
 const PHONE_SETTINGS='private-life-phone-settings-v1';
+const CONTACTS='private-life-contacts';
 const MAX_NOTIFICATIONS=60;
 
 const appGlyphs={
@@ -47,6 +48,40 @@ export default function PhoneNotifications(){
   },[]);
 
   useEffect(()=>{const timer=setInterval(()=>setClock(new Date()),30000);return()=>clearInterval(timer)},[]);
+
+
+  useEffect(()=>{
+    let cancelled=false;
+    async function backgroundWhatsAppPoll(){
+      try{
+        const contacts=JSON.parse(localStorage.getItem(CONTACTS)||'[]');
+        const adults=(Array.isArray(contacts)?contacts:[]).filter(c=>c?.id&&c?.name&&Number(c?.age)>=18).slice(0,200).map(c=>({
+          id:c.id,name:c.name,age:c.age,city:c.city,relationshipType:c.relationshipType,relation:c.relation,
+          affection:c.affection,profile:c.profile,engineContext:c.engineContext,masterSheet:c.masterSheet
+        }));
+        if(!adults.length)return;
+        const response=await fetch('/api/whatsapp',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'poll',contacts:adults})});
+        if(!response.ok)return;
+        const data=await response.json();
+        if(cancelled)return;
+        for(const message of data.delivered||[]){
+          window.dispatchEvent(new CustomEvent('private-life:notify',{detail:{
+            id:'wa-server-'+message.id,
+            app:'WhatsApp',
+            title:message.contactName||'WhatsApp',
+            body:message.type==='image'?'Foto':message.text||'Nuevo mensaje',
+            createdAt:message.createdAt||new Date().toISOString(),
+            data:{contactId:message.contactId,messageId:message.id}
+          }}));
+        }
+      }catch{}
+    }
+    backgroundWhatsAppPoll();
+    const timer=setInterval(backgroundWhatsAppPoll,7000);
+    const onFocus=()=>backgroundWhatsAppPoll();
+    window.addEventListener('focus',onFocus);
+    return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',onFocus)};
+  },[]);
 
   useEffect(()=>{
     const notify=(input={})=>{
