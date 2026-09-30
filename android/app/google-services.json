@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "222875103499",
+    "project_id": "privatelife-7887f",
+    "storage_bucket": "privatelife-7887f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:222875103499:android:87771406f7c48d8926b20e",
+        "android_client_info": {
+          "package_name": "com.privatelife.game"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTtwUXfY1EfwBbF_K75OlOOTotsuhEc_E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
