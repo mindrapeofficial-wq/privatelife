@@ -307,6 +307,69 @@ async function queueNpcReply(userId,contact,body,snapshot,delayMinutes){
   return result.rows[0];
 }
 
+async function forceNpcInitiative(userId,contact){
+  const context=await loadContext(userId,contact);
+  const recentResult=await query(
+    'SELECT body,direction,message_type,created_at FROM private_life.whatsapp_messages WHERE user_id=$1 AND contact_key=$2 ORDER BY created_at DESC LIMIT 24',
+    [userId,contact.id]
+  );
+  const recent=[...recentResult.rows].reverse();
+  const instructions=[
+    'Eres el motor de autonomía de PRIVATE LIFE.',
+    'Genera un único WhatsApp espontáneo que este personaje envía ahora por iniciativa propia.',
+    'No respondas a un mensaje concreto del jugador. El personaje inicia la conversación.',
+    'Respeta personalidad, relación, hora, rutina, recuerdos y conversación reciente.',
+    'Puede ser cotidiano, curioso, cercano, distante, coqueto o tenso si el contexto lo justifica.',
+    'No menciones IA, sistema, pruebas, prompts, variables ni panel de administración.',
+    'No inventes que conoce la ubicación o actividad actual del jugador salvo que tenga motivos para saberlo.',
+    'Devuelve solo JSON válido con message, reason y mood. message debe tener entre 1 y 320 caracteres.'
+  ].join('\n');
+  const prompt=JSON.stringify({
+    gameNow:new Date(context.clock.game_now).toISOString(),
+    player:{identity:context.save?.identity||{},profile:context.save?.profile||{}},
+    character:{
+      name:contact.name,age:contact.age,profile:contact.profile,
+      relationship:{type:contact.relationshipType,detail:contact.relation,affection:contact.affection},
+      worldCharacter:context.character||null,currentLifeState:context.lifeState||null,
+      npcConfigSnapshot:contact.npcConfigSnapshot||null
+    },
+    relevantMemories:context.mindContext?.memories||[],
+    pendingIntentions:context.mindContext?.intentions||[],
+    recentConversation:recent.slice(-14).map(m=>({side:m.direction,text:safeText(m.body,500),at:m.created_at}))
+  });
+  let generated=null;
+  try{
+    const parsed=JSON.parse(await runCentralModel(prompt,instructions));
+    const message=safeText(parsed?.message,320).trim();
+    if(message)generated={message,reason:safeText(parsed?.reason,180).trim()||'Iniciativa forzada de prueba',mood:safeText(parsed?.mood,60).trim()||'neutral'};
+  }catch{}
+  if(!generated){
+    const options=['Ey, me he acordado de ti. ¿Qué haces?','Tengo un rato libre y me ha dado por escribirte.','Oye, ¿cómo te está yendo el día?','Me quedé pensando en nuestra última conversación.'];
+    generated={message:pick(options,hash(contact.id+'|force|'+Date.now())),reason:'Fallback de iniciativa forzada',mood:'cotidiano'};
+  }
+  const row=await insertMessage(userId,contact,'in','text',generated.message,null,{
+    source:'forced_npc_initiative',
+    characterKey:context.characterKey,
+    reason:generated.reason,
+    mood:generated.mood,
+    lifeState:context.lifeState,
+    forcedAt:new Date().toISOString()
+  });
+  await query(
+    `INSERT INTO private_life.npc_autonomy_events
+      (user_id,character_key,character_name,event_type,event_data,game_at)
+      VALUES($1,$2,$3,'npc_forced_test',$4::jsonb,$5)`,
+    [userId,context.characterKey,contact.name,JSON.stringify({
+      contactId:contact.id,message:generated.message,reason:generated.reason,mood:generated.mood,lifeState:context.lifeState
+    }),new Date(context.clock.game_now)]
+  );
+  await query(
+    "INSERT INTO private_life.phone_activity (user_id,event_type,event_label,event_data) VALUES($1,'npc_forced_test',$2,$3::jsonb)",
+    [userId,contact.name,JSON.stringify({contactId:contact.id,messageId:String(row.id),message:generated.message,reason:generated.reason})]
+  );
+  return compactMessages([row])[0];
+}
+
 async function deliverDueNpcReplies(userId,contacts){
   const due=await query(`SELECT id,contact_key,contact_name,body,snapshot,deliver_after
     FROM private_life.npc_pending_messages
@@ -369,6 +432,12 @@ export async function POST(request) {
         [user.id, contact.id]
       );
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === 'force') {
+      if (!contact) return NextResponse.json({ error: 'Contacto no válido.' }, { status: 400 });
+      const message=await forceNpcInitiative(user.id,contact);
+      return NextResponse.json({ok:true,message});
     }
 
     if (action === 'poll') {
