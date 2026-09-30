@@ -106,6 +106,17 @@ export default function PhoneNotifications(){
         if(!response.ok)return;
         const data=await response.json();
         if(cancelled)return;
+        for(const message of data.npcDelivered||[]){
+          const createdAt=message.createdAt||new Date().toISOString();
+          window.dispatchEvent(new CustomEvent('private-life:notify',{detail:{
+            id:'life-wa-'+message.id,
+            app:'WhatsApp',
+            title:message.contactName||'WhatsApp',
+            body:message.type==='image'?'Foto':message.text||'Nuevo mensaje',
+            createdAt,
+            data:{contactId:message.contactId,messageId:message.id,source:'life_engine_autonomy'}
+          }}));
+        }
         for(const event of data.delivered||[]){
           const createdAt=event.deliveredAt||new Date().toISOString();
           const detail={
