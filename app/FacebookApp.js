@@ -47,6 +47,7 @@ function addPlayerToContacts(player){
       photos:player.photo?[player.photo]:[],
       profile:player.occupation||'',
       consent:true,
+      hideSourceType:true,
       test:existing>=0?(contacts[existing].test||[]):[],
       updatedAt:new Date().toISOString()
     };
