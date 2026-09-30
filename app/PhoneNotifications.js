@@ -12,13 +12,29 @@ const MAX_NOTIFICATIONS=60;
 
 const appGlyphs={
   'whatsapp':'◉','mensajes':'●','instagram':'◎','facebook':'f','tinder':'♥','grindr':'◆',
-  'contactos':'●','notas':'▤','galeria':'▧','telefono':'☎','private life':'PL','sistema':'PL'
+  'contactos':'●','notas':'▤','fotos':'▧','galeria':'▧','telefono':'☎','private life':'PL','sistema':'PL',
+  'calendario':'31','ahora':'⌖','ajustes':'⚙','app store':'A','safari':'◈','musica':'♪'
+};
+
+const appIcons={
+  'instagram':'/phone/instagram.webp',
+  'facebook':'/phone/facebook.webp',
+  'tinder':'/phone/tinder.webp',
+  'grindr':'/phone/grindr.webp',
+  'contactos':'/phone/contacts.webp',
+  'fotos':'/phone/photos.webp',
+  'galeria':'/phone/photos.webp',
+  'calendario':'/phone/calendar.webp',
+  'notas':'/phone/notes.webp',
+  'ajustes':'/phone/settings.webp',
+  'telefono':'/phone/phone.webp',
+  'mensajes':'/phone/messages.webp'
 };
 
 function normalize(value=''){
   return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
 }
-function phonePrefs(){try{return {notifications:true,vibration:true,previews:true,...JSON.parse(localStorage.getItem(PHONE_SETTINGS)||'{}')}}catch{return {notifications:true,vibration:true,previews:true}}}
+function phonePrefs(){try{return {notifications:true,badges:true,vibration:true,previews:true,...JSON.parse(localStorage.getItem(PHONE_SETTINGS)||'{}')}}catch{return {notifications:true,badges:true,vibration:true,previews:true}}}
 function load(){
   try{const value=JSON.parse(localStorage.getItem(STORAGE)||'[]');return Array.isArray(value)?value.slice(0,MAX_NOTIFICATIONS):[]}catch{return []}
 }
@@ -29,7 +45,29 @@ function relativeTime(iso){
   const h=Math.floor(min/60);if(h<24)return `${h} h`;
   const d=Math.floor(h/24);return `${d} d`;
 }
-function glyph(app){return appGlyphs[normalize(app)]||String(app||'P').trim().slice(0,2).toUpperCase()}
+function appKey(value=''){
+  const key=normalize(value);
+  if(key.includes('whatsapp'))return 'whatsapp';
+  if(key.includes('mensaje')||key==='messages')return 'mensajes';
+  if(key.includes('instagram'))return 'instagram';
+  if(key.includes('facebook'))return 'facebook';
+  if(key.includes('tinder'))return 'tinder';
+  if(key.includes('grindr'))return 'grindr';
+  if(key.includes('contact'))return 'contactos';
+  if(key.includes('foto')||key.includes('galeria')||key.includes('photo'))return 'fotos';
+  if(key.includes('calendar'))return 'calendario';
+  if(key.includes('nota'))return 'notas';
+  if(key.includes('ajuste')||key.includes('setting'))return 'ajustes';
+  if(key.includes('telefono')||key==='phone')return 'telefono';
+  if(key.includes('private life')||key.includes('sistema'))return 'private life';
+  if(key.includes('app store'))return 'app store';
+  if(key.includes('safari'))return 'safari';
+  if(key.includes('musica')||key.includes('music'))return 'musica';
+  if(key.includes('ahora'))return 'ahora';
+  return key;
+}
+function glyph(app){return appGlyphs[appKey(app)]||String(app||'P').trim().slice(0,2).toUpperCase()}
+function iconFor(app){return appIcons[appKey(app)]||''}
 
 export default function PhoneNotifications(){
   const [target,setTarget]=useState(null);
@@ -39,6 +77,8 @@ export default function PhoneNotifications(){
   const [clock,setClock]=useState(new Date());
   const gesture=useRef(null);
   const bannerGesture=useRef(null);
+  const cardGesture=useRef(null);
+  const [cardDrag,setCardDrag]=useState({id:null,dx:0});
 
   useEffect(()=>{
     setItems(load());
@@ -157,7 +197,18 @@ export default function PhoneNotifications(){
       };
       setItems(current=>[item,...current.filter(n=>n.id!==item.id)].slice(0,MAX_NOTIFICATIONS));
       setBanner(item.id);
-      if(prefs.vibration!==false&&detail.vibrate!==false&&navigator.vibrate)navigator.vibrate([45,35,45]);
+      const targetKey=appKey(item.app);
+      requestAnimationFrame(()=>{
+        const buttons=[...document.querySelectorAll('.phone .ios-app')];
+        const hit=buttons.find(button=>appKey(button.dataset.appName||button.dataset.appId||'')===targetKey);
+        if(hit){
+          hit.classList.remove('pl-notification-hit');
+          void hit.offsetWidth;
+          hit.classList.add('pl-notification-hit');
+          setTimeout(()=>hit.classList.remove('pl-notification-hit'),760);
+        }
+      });
+      if(prefs.vibration!==false&&detail.vibrate!==false&&navigator.vibrate)navigator.vibrate([42,28,42]);
       window.dispatchEvent(new CustomEvent('private-life:notification-received',{detail:item}));
     };
     window.privateLifeNotify=notify;
@@ -180,15 +231,18 @@ export default function PhoneNotifications(){
   useEffect(()=>{
     if(!target)return;
     const update=()=>{
-      const apps=[...target.querySelectorAll('.app')];
+      const prefs=phonePrefs();
+      const apps=[...target.querySelectorAll('.ios-app')];
       apps.forEach(app=>{
-        const icon=app.querySelector('.appicon');if(!icon)return;
-        const label=normalize(app.textContent);
-        const count=items.filter(n=>!n.read&&label&&(normalize(n.app).includes(label)||label.includes(normalize(n.app)))).length;
-        if(count)icon.dataset.badge=count>99?'99+':String(count);else delete icon.dataset.badge;
+        const key=appKey(app.dataset.appName||app.dataset.appId||app.textContent);
+        const count=prefs.badges===false?0:items.filter(n=>!n.read&&key&&appKey(n.app)===key).length;
+        if(count)app.dataset.badge=count>99?'99+':String(count);else delete app.dataset.badge;
       });
     };
-    update();const observer=new MutationObserver(update);observer.observe(target,{childList:true,subtree:true});return()=>observer.disconnect();
+    update();
+    const observer=new MutationObserver(update);observer.observe(target,{childList:true,subtree:true});
+    const settings=()=>update();window.addEventListener('private-life:settings-changed',settings);
+    return()=>{observer.disconnect();window.removeEventListener('private-life:settings-changed',settings)};
   },[target,items]);
 
   useEffect(()=>{
@@ -212,8 +266,12 @@ export default function PhoneNotifications(){
   }
   function clearAll(){setItems([]);setBanner(null)}
   function readAll(){setItems(current=>current.map(n=>({...n,read:true})))}
+  function dismiss(id){setItems(current=>current.filter(n=>n.id!==id));if(banner===id)setBanner(null)}
   function bannerDown(e){bannerGesture.current={x:e.clientX,y:e.clientY}}
   function bannerUp(e){if(!bannerGesture.current)return;const dx=e.clientX-bannerGesture.current.x,dy=e.clientY-bannerGesture.current.y;bannerGesture.current=null;if(Math.abs(dx)>55||dy<-35)setBanner(null)}
+  function cardDown(e,id){cardGesture.current={id,x:e.clientX,moved:false};e.currentTarget.setPointerCapture?.(e.pointerId)}
+  function cardMove(e,id){const g=cardGesture.current;if(!g||g.id!==id)return;const dx=e.clientX-g.x;if(Math.abs(dx)>5)g.moved=true;setCardDrag({id,dx:Math.max(-130,Math.min(130,dx))})}
+  function cardUp(e,item){const g=cardGesture.current;cardGesture.current=null;const dx=cardDrag.id===item.id?cardDrag.dx:0;setCardDrag({id:null,dx:0});if(g?.moved&&Math.abs(dx)>76){dismiss(item.id);return}if(!g?.moved)open(item)}
   function shadeDown(e){if(e.target.closest('.pl-notification-card,button'))return;gesture.current={start:e.clientY,last:e.clientY,shade:true}}
   function shadeMove(e){if(gesture.current?.shade)gesture.current.last=e.clientY}
   function shadeUp(){if(gesture.current?.shade&&gesture.current.last-gesture.current.start<-45)setShade(false);if(gesture.current?.shade)gesture.current=null}
@@ -224,7 +282,7 @@ export default function PhoneNotifications(){
 
   return createPortal(<>
     {currentBanner&&!shade&&<div className="pl-notification-banner" onPointerDown={bannerDown} onPointerUp={bannerUp} onClick={()=>open(currentBanner)} role="button" aria-label={`Notificación de ${currentBanner.app}`}>
-      <div className="pl-notification-icon">{currentBanner.icon?<img src={currentBanner.icon} alt=""/>:glyph(currentBanner.app)}</div>
+      <div className="pl-notification-icon">{(currentBanner.icon||iconFor(currentBanner.app))?<img src={currentBanner.icon||iconFor(currentBanner.app)} alt=""/>:glyph(currentBanner.app)}</div>
       <div className="pl-notification-copy"><div><b>{currentBanner.app}</b><span>{relativeTime(currentBanner.createdAt)}</span></div><strong>{currentBanner.title}</strong>{currentBanner.body&&<p>{currentBanner.body}</p>}</div>
     </div>}
     {shade&&<div className="pl-notification-shade" onPointerDown={shadeDown} onPointerMove={shadeMove} onPointerUp={shadeUp}>
@@ -234,9 +292,18 @@ export default function PhoneNotifications(){
         <div className="pl-notification-clock"><b>{time}</b><span>{date}</span></div>
         <div className="pl-notification-tools"><span>{unread?`${unread} sin leer`:'Al día'}</span><div>{unread>0&&<button onClick={readAll}>Marcar leídas</button>}{items.length>0&&<button onClick={clearAll}>Borrar</button>}</div></div>
         <div className="pl-notification-list">
-          {!items.length?<div className="pl-notification-empty"><b>Sin notificaciones</b><span>Todo tranquilo por ahora.</span></div>:items.map(item=><article key={item.id} className={`pl-notification-card ${item.read?'read':'unread'}`} onClick={()=>open(item)}>
-            <div className="pl-notification-icon">{item.icon?<img src={item.icon} alt=""/>:glyph(item.app)}</div>
+          {!items.length?<div className="pl-notification-empty"><b>Sin notificaciones</b><span>Todo tranquilo por ahora.</span></div>:items.map(item=><article
+            key={item.id}
+            className={`pl-notification-card ${item.read?'read':'unread'}`}
+            onPointerDown={e=>cardDown(e,item.id)}
+            onPointerMove={e=>cardMove(e,item.id)}
+            onPointerUp={e=>cardUp(e,item)}
+            onPointerCancel={()=>{cardGesture.current=null;setCardDrag({id:null,dx:0})}}
+            style={cardDrag.id===item.id?{transform:`translateX(${cardDrag.dx}px)`,opacity:String(Math.max(.35,1-Math.abs(cardDrag.dx)/210))}:undefined}
+          >
+            <div className="pl-notification-icon">{(item.icon||iconFor(item.app))?<img src={item.icon||iconFor(item.app)} alt=""/>:glyph(item.app)}</div>
             <div className="pl-notification-copy"><div><b>{item.app}</b><span>{relativeTime(item.createdAt)}</span></div><strong>{item.title}</strong>{item.body&&<p>{item.body}</p>}</div>
+            <span className="pl-notification-swipe-hint">‹</span>
           </article>)}
         </div>
         <div className="pl-notification-homebar" onClick={()=>setShade(false)}/>
