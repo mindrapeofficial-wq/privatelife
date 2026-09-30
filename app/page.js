@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ContactsApp from './ContactsApp';
 import FacebookApp from './FacebookApp';
 import WhatsAppApp from './WhatsAppApp';
+import PhoneNotifications from './PhoneNotifications';
 import PrivateLifeApp from './PrivateLifeApp';
 import PhoneAppStore, { APP_STORE_CATALOG, buildAppNarrativeContext } from './PhoneAppStore';
 
@@ -418,6 +419,6 @@ function PhotoCropper({src,onCancel,onSave}){
 
 function Progress({n}){return <div className="progress">{[1,2,3,4].map(x=><i key={x} className={x<=n?'on':''}/>)}</div>}
 function Input({label,value,set,type='text'}){return <label><span>{label}</span><input type={type} value={value} onChange={e=>set(e.target.value)}/></label>}
-function Phone({children}){return <main className="stage"><div className="phone">{children}<div className="gesture"/></div></main>}
+function Phone({children}){return <main className="stage"><div className="phone">{children}<PhoneNotifications/><div className="gesture"/></div></main>}
 function Status(){const [now,setNow]=useState(null);useEffect(()=>{const tick=()=>setNow(new Date());tick();const id=setInterval(tick,30000);return()=>clearInterval(id)},[]);const time=now?now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'--:--';return <div className="status"><b>{time}</b><span className="status-icons"><span className="signal-bars"><i/><i/><i/><i/></span><span className="wifi-glyph">⌁</span><span className="battery"><i/></span></span></div>}
 function App({icon,name}){return <div className="app"><div className="appicon">{icon}</div>{name&&<span>{name}</span>}</div>}
