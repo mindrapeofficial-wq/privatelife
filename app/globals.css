@@ -345,3 +345,12 @@
 @media(max-width:430px){
  .fb-wordmark{font-size:23px}.fb-request-card{flex-basis:165px}.fb-inline-actions{flex-direction:column}
 }
+
+
+/* Director · incomplete legacy NPC helpers */
+.admin-sheet-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.admin-procedural-fill{border-color:#325b45!important;background:#10251a!important;color:#8df2ae!important}
+.admin-incomplete-banner{display:flex;align-items:flex-start;gap:12px;margin:0 0 16px;padding:12px 14px;border:1px solid #5f4b26;border-radius:12px;background:#21190d;color:#d9c59c}
+.admin-incomplete-banner b{white-space:nowrap;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.admin-incomplete-banner span{font-size:10px;line-height:1.5;color:#b9a77f}
+@media(max-width:700px){.admin-card-head{align-items:flex-start}.admin-sheet-actions{justify-content:flex-start}.admin-incomplete-banner{flex-direction:column;gap:4px}}
