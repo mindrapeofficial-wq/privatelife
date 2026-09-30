@@ -97,7 +97,7 @@ function phoneAppIcon(name){const icons={Instagram:'/phone/instagram.webp',Tinde
 export default function AdminPage(){
   const [ready,setReady]=useState(false),[users,setUsers]=useState([]),[selectedId,setSelectedId]=useState('');
   const [player,setPlayer]=useState(null),[tab,setTab]=useState('overview'),[charId,setCharId]=useState('');
-  const [eventDraft,setEventDraft]=useState(''),[chatDraft,setChatDraft]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
+  const [eventDraft,setEventDraft]=useState(''),[chatDraft,setChatDraft]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[aiHealth,setAiHealth]=useState(null),[aiHealthBusy,setAiHealthBusy]=useState(false);
   const [chat,setChat]=useState([{role:'ai',text:'Director conectado. Selecciona una partida y pregúntame qué está ocurriendo.'}]);
 
   async function loadUsers(preferred){
@@ -115,6 +115,18 @@ export default function AdminPage(){
       setPlayer(loaded);setCharId(loaded.save.world.characters[0]?.id||'');
     }catch(e){setNotice(e.message)}finally{setBusy(false)}
   }
+  async function testCentralAI(){
+    setAiHealthBusy(true);
+    try{
+      const data=await api('/api/admin/ai-health',{cache:'no-store'});
+      setAiHealth(data);
+    }catch(e){
+      setAiHealth({ok:false,configured:false,reachable:false,status:'request_failed',message:e.message});
+    }finally{
+      setAiHealthBusy(false);
+    }
+  }
+
   async function refreshPhone(id){
     if(!id)return;
     try{
@@ -357,7 +369,7 @@ export default function AdminPage(){
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>COLA NARRATIVA</span></div><div className="admin-event-list">{events.map(ev=><div key={ev.id} className="admin-event"><div><b>{ev.description}</b><small>{fmt(ev.createdAt)} · {ev.trigger||'manual'}</small></div><select value={ev.status||'pendiente'} onChange={e=>localEdit(next=>{next.world.events=next.world.events.map(x=>x.id===ev.id?{...x,status:e.target.value}:x)})}><option value="pendiente">Pendiente</option><option value="activo">Activo</option><option value="cerrado">Cerrado</option></select></div>)}{!events.length&&<div className="admin-empty">No hay eventos programados.</div>}</div><button className="admin-primary secondary" disabled={busy} onClick={()=>persist(save,'Estados de eventos actualizados')}>Guardar estados</button></section>
         </div>}
 
-        {tab==='director'&&<section className="admin-card admin-director"><div className="admin-card-head"><span>DIRECTOR IA · @{player.username}</span></div><div className="admin-chat">{chat.map((m,i)=><div key={i} className={'admin-message '+m.role}><b>{m.role==='ai'?'DIRECTOR AI':'ADMIN'}</b><p>{m.text}</p></div>)}</div><form className="admin-chat-form" onSubmit={sendDirector}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} placeholder="Ej.: Ponte al día · Crea personaje llamado Irene · Manda WhatsApp a Irene: ¿Dónde estás? · Programa evento: ..."/><button disabled={!chatDraft.trim()||busy}>Enviar</button></form></section>}
+        {tab==='director'&&<section className="admin-card admin-director"><div className="admin-card-head"><span>DIRECTOR IA · @{player.username}</span><button onClick={testCentralAI} disabled={aiHealthBusy}>{aiHealthBusy?'Probando…':'Probar IA central'}</button></div>{aiHealth&&<div className={'admin-ai-health '+(aiHealth.ok?'ok':'bad')}><b>{aiHealth.ok?'IA CENTRAL CONECTADA':'IA CENTRAL CON PROBLEMAS'}</b><span>Clave: {aiHealth.configured?'detectada':'no detectada'} · Red: {aiHealth.reachable?'OK':'fallo'} · Modelo: {aiHealth.model||'—'}{aiHealth.latencyMs!=null?' · '+aiHealth.latencyMs+' ms':''}</span>{aiHealth.message&&<p>{aiHealth.message}</p>}</div>}<div className="admin-chat">{chat.map((m,i)=><div key={i} className={'admin-message '+m.role}><b>{m.role==='ai'?'DIRECTOR AI':'ADMIN'}</b><p>{m.text}</p></div>)}</div><form className="admin-chat-form" onSubmit={sendDirector}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} placeholder="Ej.: Ponte al día · Crea personaje llamado Irene · Manda WhatsApp a Irene: ¿Dónde estás? · Programa evento: ..."/><button disabled={!chatDraft.trim()||busy}>Enviar</button></form></section>}
       </>}
     </section>
   </main>
