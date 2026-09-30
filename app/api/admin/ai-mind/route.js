@@ -95,7 +95,13 @@ export async function POST(request){
     if(!validUserId(userId))return NextResponse.json({error:'Jugador no válido.'},{status:400});
     if(body?.action!=='review_now')return NextResponse.json({error:'Acción no válida.'},{status:400});
 
-    const clock=await getWorldNow(userId,body?.timezone||'UTC');
+    const timezoneResult=await query(`
+      SELECT COALESCE(
+        (SELECT timezone FROM private_life.player_location WHERE user_id=$1 LIMIT 1),
+        (SELECT timezone FROM private_life.world_clock WHERE user_id=$1 LIMIT 1),
+        'UTC'
+      ) AS timezone`,[userId]);
+    const clock=await getWorldNow(userId,timezoneResult.rows[0]?.timezone||'UTC');
     let context=await getPlayerContext(userId);
     if(!context)context=await ensurePlayerContext(userId,new Date(clock.game_now));
     const loc=await query('SELECT display_label,area,city,region,country,country_code,timezone FROM private_life.player_location WHERE user_id=$1 LIMIT 1',[userId]);
