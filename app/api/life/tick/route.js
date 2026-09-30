@@ -149,6 +149,16 @@ async function writeAutonomyState(userId,candidate,nextAction,{lastAction=null,d
       updated_at=NOW()`,
     [userId,candidate.characterKey,nextAction,lastAction,dayKey,dailyCount,JSON.stringify(stateData)]);
 }
+
+async function claimDueState(userId,characterKey,expectedDue,gameNow){
+  const leaseUntil=scheduleFrom(gameNow,15);
+  const result=await query(`UPDATE private_life.npc_autonomy_state
+    SET next_action_game_at=$1,updated_at=NOW()
+    WHERE user_id=$2 AND character_key=$3 AND next_action_game_at=$4
+    RETURNING character_key,next_action_game_at,last_action_game_at,daily_key,daily_count,state_data`,
+    [leaseUntil,userId,characterKey,expectedDue]);
+  return result.rows[0]||null;
+}
 function compact(row){
   return {
     id:String(row.id),contactId:row.contact_key,contactName:row.contact_name,
@@ -228,24 +238,31 @@ export async function POST(request){
         continue;
       }
 
+      const claimed=await claimDueState(user.id,candidate.characterKey,existing.next_action_game_at,gameNow);
+      if(!claimed){
+        decisions.push({characterKey:candidate.characterKey,name:candidate.name,action:'already_claimed'});
+        continue;
+      }
+      const activeState={...existing,...claimed};
+
       if(offlineGapMinutes>3&&candidate.profile.offlineBehavior===false){
         const next=scheduleFrom(gameNow,nextAutonomyDelayMinutes(candidate.profile,candidate.characterKey+'|online-only|'+dayKey));
         await writeAutonomyState(user.id,candidate,next,{
-          lastAction:existing.last_action_game_at,dayKey,dailyCount,stateData:{...(existing.state_data||{}),lastDecision:'offline_skipped'}
+          lastAction:activeState.last_action_game_at,dayKey,dailyCount,stateData:{...(activeState.state_data||{}),lastDecision:'offline_skipped'}
         });
         decisions.push({characterKey:candidate.characterKey,name:candidate.name,action:'offline_skipped',nextActionGameAt:next.toISOString()});
         continue;
       }
 
-      const decision=dueDecision({candidate,state:existing,gameNow,timezone:clock.timezone||timezone,recent});
+      const decision=dueDecision({candidate,state:activeState,gameNow,timezone:clock.timezone||timezone,recent});
       if(decision.action!=='initiate'||generatedCount>=4){
         const minutes=decision.action==='initiate'?clamp(90+generatedCount*60,90,360):Math.max(5,Number(decision.minutes)||60);
         const next=scheduleFrom(gameNow,minutes);
         await writeAutonomyState(user.id,candidate,next,{
-          lastAction:existing.last_action_game_at,
+          lastAction:activeState.last_action_game_at,
           dayKey:decision.dayKey||dayKey,
           dailyCount:decision.dailyCount??dailyCount,
-          stateData:{...(existing.state_data||{}),lastDecision:decision.action,lifeState:candidate.lifeState}
+          stateData:{...(activeState.state_data||{}),lastDecision:decision.action,lifeState:candidate.lifeState}
         });
         decisions.push({characterKey:candidate.characterKey,name:candidate.name,action:decision.action==='initiate'?'capacity_deferred':decision.action,nextActionGameAt:next.toISOString()});
         continue;
@@ -271,7 +288,7 @@ export async function POST(request){
         dayKey:decision.dayKey||dayKey,
         dailyCount:(decision.dailyCount??dailyCount)+1,
         stateData:{
-          ...(existing.state_data||{}),
+          ...(activeState.state_data||{}),
           lastDecision:'initiated',
           lastReason:generated.reason,lastMood:generated.mood,
           lastMessageId:String(message.id),lifeState:candidate.lifeState
