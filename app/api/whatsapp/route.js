@@ -89,7 +89,7 @@ function writingExamples(contact) {
 }
 
 
-async function directorModelReply({ contact, character, text, hasImage, recent, events, phoneActivity, save, lifeState }) {
+async function directorModelReply({ contact, character, text, hasImage, recent, events, phoneActivity, save, lifeState, playerContext }) {
   try {
     const instructions = [
       'Eres el motor narrativo central de PRIVATE LIFE.',
@@ -100,6 +100,7 @@ async function directorModelReply({ contact, character, text, hasImage, recent, 
       'Mantén continuidad con personalidad, relación, historial, eventos y actividad reciente.',
       'No conviertas cada mensaje en drama: deja silencios, ambigüedad y cambios de humor naturales.',
       'Respeta el estado de vida actual del personaje. Si está trabajando, estudiando, durmiendo o desplazándose, no actúes como si estuviera libre. Puedes reflejarlo de forma natural solo cuando tenga sentido.',
+      'El contexto actual del jugador es información interna del motor. El personaje NO conoce automáticamente su ubicación o actividad: úsalo para ritmo y plausibilidad, y solo menciónalo si la conversación o el historial demuestra que lo sabe.',
       'Devuelve exclusivamente JSON válido con: reply (string), relationshipDeltas (objeto opcional con confianza, atraccion, apego, tension, sospecha, celos, curiosidad, resentimiento entre -5 y 5), eventSuggestion (string opcional, máximo 240 caracteres).'
     ].join('\n');
 
@@ -108,6 +109,7 @@ async function directorModelReply({ contact, character, text, hasImage, recent, 
       player: {
         identity: save?.identity || {},
         profile: save?.profile || {},
+        currentContext: playerContext || null,
       },
       contact,
       worldCharacter: character || null,
@@ -239,10 +241,11 @@ async function getLifeClock(userId) {
 }
 
 async function loadContext(userId, contact) {
-  const [saveResult,activity,clock]=await Promise.all([
+  const [saveResult,activity,clock,playerContextResult]=await Promise.all([
     query('SELECT save_data FROM private_life.game_saves WHERE user_id = $1 LIMIT 1', [userId]),
     query('SELECT event_type, event_label, event_data, created_at FROM private_life.phone_activity WHERE user_id = $1 ORDER BY created_at DESC LIMIT 60',[userId]),
-    getLifeClock(userId)
+    getLifeClock(userId),
+    query('SELECT location_key,location_label,activity_key,activity_label,availability,social_exposure,privacy,started_game_at,expected_until_game_at,revision,updated_at FROM private_life.player_context WHERE user_id=$1 LIMIT 1',[userId])
   ]);
   const save = saveResult.rows[0]?.save_data || {};
   const character = findCharacter(save, contact);
@@ -258,7 +261,7 @@ async function loadContext(userId, contact) {
     characterKey:String(character?.id||contact?.npcId||contact?.id||contact?.name||'npc'),
     seed:String(Date.now())
   });
-  return { save, character, events: eventList, phoneActivity: activity.rows || [], clock, lifeState };
+  return { save, character, events: eventList, phoneActivity: activity.rows || [], clock, lifeState, playerContext: playerContextResult.rows[0] || null };
 }
 
 async function saveWorld(userId, save) {
@@ -411,6 +414,7 @@ export async function POST(request) {
       phoneActivity: context.phoneActivity,
       save: context.save,
       lifeState: context.lifeState,
+      playerContext: context.playerContext,
     });
 
     const reply = modelResult?.reply || centralReply({
