@@ -7,6 +7,7 @@ const STORAGE='private-life-notifications-v1';
 const INTRO='private-life-notifications-intro-v1';
 const PHONE_SETTINGS='private-life-phone-settings-v1';
 const CONTACTS='private-life-contacts';
+const STORY='private-life-narrative-events-v1';
 const MAX_NOTIFICATIONS=60;
 
 const appGlyphs={
@@ -79,6 +80,56 @@ export default function PhoneNotifications(){
     backgroundWhatsAppPoll();
     const timer=setInterval(backgroundWhatsAppPoll,7000);
     const onFocus=()=>backgroundWhatsAppPoll();
+    window.addEventListener('focus',onFocus);
+    return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',onFocus)};
+  },[]);
+
+  useEffect(()=>{
+    let cancelled=false;
+    async function backgroundLifePoll(){
+      try{
+        const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+        const response=await fetch('/api/life/tick?timezone='+encodeURIComponent(timezone),{
+          cache:'no-store',
+          credentials:'same-origin',
+          headers:{Accept:'application/json'}
+        });
+        if(!response.ok)return;
+        const data=await response.json();
+        if(cancelled)return;
+        for(const event of data.delivered||[]){
+          const createdAt=event.deliveredAt||new Date().toISOString();
+          const detail={
+            id:'life-server-'+event.id,
+            app:event.app||'PRIVATE LIFE',
+            title:event.title||'PRIVATE LIFE',
+            body:event.body||'',
+            createdAt,
+            priority:'normal',
+            data:{eventType:event.type||'life_event',payload:event.payload||{}}
+          };
+          window.dispatchEvent(new CustomEvent('private-life:notify',{detail}));
+          try{
+            const current=JSON.parse(localStorage.getItem(STORY)||'[]');
+            const storyEvent={
+              id:'life-'+event.id,
+              createdAt,
+              source:'life-engine',
+              type:event.type||'life_event',
+              title:event.title||'',
+              text:event.body||'',
+              payload:event.payload||{}
+            };
+            const list=Array.isArray(current)?current:[];
+            localStorage.setItem(STORY,JSON.stringify([storyEvent,...list.filter(x=>x?.id!==storyEvent.id)].slice(0,250)));
+            window.dispatchEvent(new CustomEvent('private-life:narrative-event',{detail:storyEvent}));
+          }catch{}
+        }
+      }catch{}
+    }
+    backgroundLifePoll();
+    const timer=setInterval(backgroundLifePoll,12000);
+    const onFocus=()=>backgroundLifePoll();
     window.addEventListener('focus',onFocus);
     return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',onFocus)};
   },[]);
