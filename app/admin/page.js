@@ -634,6 +634,8 @@ export default function AdminPage(){
         {tab==='events'&&<div className="admin-grid">
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>NUEVO EVENTO</span></div><textarea className="admin-event-input" value={eventDraft} onChange={e=>setEventDraft(e.target.value)} placeholder="Ej.: Si pasan tres días sin hablar, Claudia toma la iniciativa."/><button className="admin-primary" disabled={!eventDraft.trim()||busy} onClick={()=>addEvent()}>Programar evento</button></section>
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>COLA NARRATIVA</span></div><div className="admin-event-list">{events.map(ev=><div key={ev.id} className="admin-event"><div><b>{ev.description}</b><small>{fmt(ev.createdAt)} · {ev.trigger||'manual'}</small></div><select value={ev.status||'pendiente'} onChange={e=>localEdit(next=>{next.world.events=next.world.events.map(x=>x.id===ev.id?{...x,status:e.target.value}:x)})}><option value="pendiente">Pendiente</option><option value="activo">Activo</option><option value="cerrado">Cerrado</option></select></div>)}{!events.length&&<div className="admin-empty">No hay eventos programados.</div>}</div><button className="admin-primary secondary" disabled={busy} onClick={()=>persist(save,'Estados de eventos actualizados')}>Guardar estados</button></section>
+          <section className="admin-card admin-wide"><div className="admin-card-head"><span>CONSECUENCIAS PENDIENTES</span></div><div className="admin-event-list">{causalConsequences.filter(c=>['pending','claimed'].includes(c.status)).slice(0,30).map(c=><div className="admin-event" key={'cq-'+c.id}><div><b>{c.type} · prioridad {c.priority}</b><p>{c.summary}</p><small>vence {fmt(c.dueGameAt)} · probabilidad {c.probability}% · causa #{c.sourceNodeId}</small></div></div>)}{!causalConsequences.some(c=>['pending','claimed'].includes(c.status))&&<div className="admin-empty">No hay consecuencias pendientes.</div>}</div></section>
+          <section className="admin-card admin-wide"><div className="admin-card-head"><span>CADENAS CAUSALES RECIENTES</span></div><div className="admin-event-list">{(causalGraph?.analytics?.recentChains||[]).slice(0,12).map(chain=><div className="admin-event" key={'chain-'+chain.id}><div><b>{chain.summary}</b><p>{(chain.children||[]).length} consecuencias directas · importancia {chain.importance}</p><small>{fmt(chain.occurredGameAt)} · {chain.sourceType}</small></div></div>)}{!(causalGraph?.analytics?.recentChains||[]).length&&<div className="admin-empty">Todavía no hay cadenas causales con descendientes.</div>}</div></section>
         </div>}
 
         {tab==='mind'&&<div className="admin-ai-mind">
@@ -664,7 +666,20 @@ export default function AdminPage(){
                 <div><dt>Vínculos NPC↔NPC</dt><dd>{aiRun?.context?.counts?.socialEdges??socialEdges.length}</dd></div>
                 <div><dt>Eventos sociales</dt><dd>{aiRun?.context?.counts?.recentSocialEvents??socialEvents.length}</dd></div>
                 <div><dt>Información activa</dt><dd>{aiRun?.context?.counts?.activeInformation??socialInformation.length}</dd></div>
+                <div><dt>Nodos causales</dt><dd>{aiRun?.context?.counts?.causalNodes??causalNodes.length}</dd></div>
+                <div><dt>Consecuencias pendientes</dt><dd>{aiRun?.context?.counts?.pendingConsequences??causalConsequences.filter(c=>c.status==='pending').length}</dd></div>
+                <div><dt>Cadenas activas</dt><dd>{aiRun?.context?.counts?.causalChains??(causalGraph?.analytics?.recentChains||[]).length}</dd></div>
               </dl>
+            </div>
+
+            <div className="admin-card">
+              <div className="admin-card-head"><span>SEÑALES CAUSALES ANALIZADAS</span></div>
+              <div className="admin-ai-observations">
+                {(aiRun?.context?.causalAnalysis?.pendingConsequences||causalGraph?.analytics?.pendingConsequences||[]).slice(0,3).map((x,i)=><div key={'cp'+i}><i>→</i><p>Pendiente: {x.summary} · prioridad {x.priority}</p></div>)}
+                {(aiRun?.context?.causalAnalysis?.openRoots||causalGraph?.analytics?.openRoots||[]).slice(0,3).map((x,i)=><div key={'cr'+i}><i>○</i><p>Raíz abierta: {x.summary}</p></div>)}
+                {(aiRun?.context?.causalAnalysis?.highLeverageNodes||causalGraph?.analytics?.highLeverageNodes||[]).slice(0,3).map((x,i)=><div key={'cl'+i}><i>◆</i><p>Nodo de alto impacto: {x.node?.summary||x.nodeId} · {x.connections} conexiones</p></div>)}
+                {!((aiRun?.context?.causalAnalysis?.pendingConsequences||causalGraph?.analytics?.pendingConsequences||[]).length||(aiRun?.context?.causalAnalysis?.openRoots||causalGraph?.analytics?.openRoots||[]).length)&&<div className="admin-empty">Todavía no hay una cadena causal activa que requiera atención.</div>}
+              </div>
             </div>
 
             <div className="admin-card">
@@ -701,6 +716,7 @@ export default function AdminPage(){
                 <div><b>{aiPlan.messages?.length||0}</b><span>Mensajes</span></div>
                 <div><b>{aiPlan.socialActions?.length||0}</b><span>Acciones sociales</span></div>
                 <div><b>{aiPlan.informationActions?.length||0}</b><span>Movimientos info</span></div>
+                <div><b>{aiPlan.causalActions?.length||0}</b><span>Acciones causales</span></div>
                 <div><b>{aiActionCount}</b><span>Acciones totales</span></div>
               </div>
             </div>
@@ -714,6 +730,7 @@ export default function AdminPage(){
               {(aiPlan.relationshipUpdates||[]).map((x,i)=><article key={'ru'+i}><span className="kind">RELACIÓN</span><div><b>{x.name||x.id||'Personaje'}</b><p>{Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · ')||'Sin cambios'}</p></div></article>)}
               {(aiPlan.socialActions||[]).map((x,i)=><article key={'sa'+i}><span className="kind">SOCIAL</span><div><b>{x.actorKey||'NPC'} ↔ {x.targetKey||'NPC'}</b><p>{x.summary||x.type||'Interacción social'}{Object.keys(x.deltas||{}).length?' · '+Object.entries(x.deltas||{}).map(([k,v])=>k+' '+(Number(v)>=0?'+':'')+v).join(' · '):''}</p></div></article>)}
               {(aiPlan.informationActions||[]).map((x,i)=><article key={'ia'+i}><span className="kind">INFO</span><div><b>{x.action==='share'?'Difusión':'Nueva información'} · {x.infoKey||'sin clave'}</b><p>{x.content||x.summary||x.reason||[x.fromKey,x.toKey].filter(Boolean).join(' → ')||'Movimiento de información social'}</p></div></article>)}
+              {(aiPlan.causalActions||[]).map((x,i)=><article key={'ca'+i}><span className="kind">CAUSA</span><div><b>{x.action||'acción causal'} · {x.type||x.nodeType||''}</b><p>{x.summary||x.reason||x.sourceNodeKey||('nodo '+String(x.sourceNodeId||'—'))}</p></div></article>)}
               {(aiPlan.events||[]).map((x,i)=><article key={'ev'+i}><span className="kind">EVENTO</span><div><b>{x.title||x.type||'Evento'}</b><p>{x.reason||x.body||''}{x.delayMinutes!=null?' · en '+x.delayMinutes+' min':''}</p></div></article>)}
               {(aiPlan.messages||[]).map((x,i)=><article key={'msg'+i}><span className="kind">MENSAJE</span><div><b>{x.contactName||'Contacto'}</b><p>{x.reason||x.text||''}{x.delayMinutes!=null?' · en '+x.delayMinutes+' min':''}</p></div></article>)}
               {!aiActionCount&&<div className="admin-empty">La IA decidió no ejecutar ninguna acción en este ciclo. El silencio también es una decisión del motor.</div>}
@@ -723,7 +740,7 @@ export default function AdminPage(){
           <section className="admin-card admin-ai-history">
             <div className="admin-card-head"><span>HISTORIAL DE CICLOS</span><button onClick={()=>loadAiMind(player.id)} disabled={aiMindBusy}>Actualizar</button></div>
             <div className="admin-ai-run-list">
-              {aiRuns.map(run=><button key={run.id} className={String(aiRun?.id)===String(run.id)?'active':''} onClick={()=>setAiMindSelectedRun(String(run.id))}><span><b>{fmt(run.gameAt)}</b><small>{run.queuedEvents} eventos · {run.queuedMessages} mensajes · {(run.plan?.socialActions?.length||0)} sociales</small></span><p>{run.summary||'Sin resumen'}</p></button>)}
+              {aiRuns.map(run=><button key={run.id} className={String(aiRun?.id)===String(run.id)?'active':''} onClick={()=>setAiMindSelectedRun(String(run.id))}><span><b>{fmt(run.gameAt)}</b><small>{run.queuedEvents} eventos · {run.queuedMessages} mensajes · {(run.plan?.socialActions?.length||0)} sociales · {(run.plan?.causalActions?.length||0)} causales</small></span><p>{run.summary||'Sin resumen'}</p></button>)}
               {!aiRuns.length&&<div className="admin-empty">Todavía no hay ciclos autónomos guardados.</div>}
             </div>
           </section>
