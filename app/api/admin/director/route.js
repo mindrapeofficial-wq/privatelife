@@ -106,10 +106,17 @@ function directorInstructions() {
     '6) queue_whatsapp: programa un WhatsApp de un contacto/personaje existente. args={contactName,text,delayMinutes}.',
     '7) update_player_traits: ajusta variables ocultas visibles en el panel. args={patch}; valores 0 a 100.',
     'Para preguntas, análisis o resúmenes no necesitas ejecutar acciones.',
+    'Cuando el administrador pida análisis, estrategia, explicación o diagnóstico, responde con profundidad proporcional a la petición. No te limites a una frase corta.',
+    'Cruza explícitamente los datos relevantes de jugador, contexto vivo, ubicación, teléfono, WhatsApp, personajes, relaciones, eventos, rutinas, historial y reloj cuando sean pertinentes.',
+    'Distingue con claridad hechos observados, inferencias razonables, incertidumbres, riesgos narrativos y posibles líneas de acción.',
+    'Puedes desarrollar análisis largos y complejos si aportan valor. Evita relleno, repeticiones y generalidades.',
+    'Si detectas contradicciones o huecos en el mundo, señálalos y explica cómo podrían afectar a la simulación.',
+    'Cuando propongas acciones, explica en reply por qué encajan con el estado actual y qué consecuencias podrían tener, sin revelar razonamiento interno paso a paso.',
+    'El administrador puede pedir escenarios hipotéticos. Compáralos de forma causal: qué cambiaría, qué personajes reaccionarían, qué eventos se abrirían o cerrarían y qué efectos secundarios serían plausibles.'
     'No uses una herramienta si el administrador solo pregunta qué está ocurriendo.',
     'Si una orden es ambigua, responde pidiendo el dato que falta y devuelve actions vacío.',
     'Devuelve SOLO JSON válido: {"reply":"respuesta para el administrador","actions":[{"type":"...","args":{}}]}.',
-    'Máximo 8 acciones por respuesta. La respuesta debe explicar brevemente qué entendiste y qué hiciste, sin exponer razonamiento interno.'
+    'Máximo 8 acciones por respuesta. La respuesta debe ser tan breve o profunda como requiera la petición del administrador. Explica qué entendiste, qué observaste, qué hiciste y las consecuencias relevantes, sin exponer razonamiento interno paso a paso.'
   ].join('\n');
 }
 
@@ -437,9 +444,9 @@ export async function POST(request) {
     const body = await request.json();
     const userId = String(body?.userId || '');
     const prompt = clip(body?.prompt, 8000);
-    const history = arr(body?.history).slice(-12).map(item => ({
+    const history = arr(body?.history).slice(-20).map(item => ({
       role: item?.role === 'admin' ? 'admin' : 'ai',
-      text: clip(item?.text, 1800)
+      text: clip(item?.text, 3000)
     }));
 
     if (!/^\d+$/.test(userId) || !prompt) {
@@ -469,7 +476,7 @@ export async function POST(request) {
     const save = structuredClone(loaded.save);
     const { saveChanged, executed } = await executeActions(userId, loaded.runtime, save, decision.actions);
 
-    const reply = clip(decision.reply || 'He revisado la partida.', 7000);
+    const reply = clip(decision.reply || 'He revisado la partida.', 20000);
     save.world.directorLog = [
       {
         id: uid('admin-ai'),
