@@ -3,6 +3,7 @@ import { getCurrentUser } from '../../../lib/auth.js';
 import { ensureSchema, query } from '../../../lib/db.js';
 import { runCentralModel } from '../../../lib/central-ai-provider.js';
 import { resolveRoutineState } from '../../../lib/life-routines.js';
+import { characterMemoryKey, loadMindContext, persistExchangeMind, forgetLowValueMemories } from '../../../lib/life-memory.js';
 
 export const runtime = 'nodejs';
 
@@ -89,7 +90,7 @@ function writingExamples(contact) {
 }
 
 
-async function directorModelReply({ contact, character, text, hasImage, recent, events, phoneActivity, save, lifeState, playerContext, playerLocation }) {
+async function directorModelReply({ contact, character, text, hasImage, recent, events, phoneActivity, save, lifeState, playerContext, playerLocation, mindContext }) {
   try {
     const instructions = [
       'Eres el motor narrativo central de PRIVATE LIFE.',
@@ -104,7 +105,7 @@ async function directorModelReply({ contact, character, text, hasImage, recent, 
       'No conviertas cada mensaje en drama: deja silencios, ambigüedad y cambios de humor naturales.',
       'Respeta el estado de vida actual del personaje. Si está trabajando, estudiando, durmiendo o desplazándose, no actúes como si estuviera libre. Puedes reflejarlo de forma natural solo cuando tenga sentido.',
       'El contexto actual del jugador es información interna del motor. El personaje NO conoce automáticamente su ubicación o actividad: úsalo para ritmo y plausibilidad, y solo menciónalo si la conversación o el historial demuestra que lo sabe.',
-      'Devuelve exclusivamente JSON válido con: reply (string), relationshipDeltas (objeto opcional con confianza, atraccion, apego, tension, sospecha, celos, curiosidad, resentimiento entre -5 y 5), eventSuggestion (string opcional, máximo 240 caracteres).'
+      'Devuelve exclusivamente JSON válido con: reply (string), relationshipDeltas (objeto opcional con confianza, atraccion, apego, tension, sospecha, celos, curiosidad, resentimiento entre -5 y 5), eventSuggestion (string opcional, máximo 240 caracteres), memories (array opcional de máximo 4 objetos {type,summary,importance,emotionalValence}), intentions (array opcional de máximo 3 objetos {type,summary,priority,delayMinutes,dueMinutes,behavior}). behavior puede ser follow_up, ask, propose, send o wait.'
     ].join('\n');
 
     const prompt = JSON.stringify({
@@ -118,6 +119,10 @@ async function directorModelReply({ contact, character, text, hasImage, recent, 
       contact,
       worldCharacter: character || null,
       lifeState: lifeState || null,
+      memory: {
+        relevantMemories: mindContext?.memories || [],
+        pendingIntentions: mindContext?.intentions || [],
+      },
       latestPlayerMessage: {
         type: hasImage ? 'image' : 'text',
         text,
@@ -159,6 +164,8 @@ async function directorModelReply({ contact, character, text, hasImage, recent, 
       reply,
       relationshipDeltas,
       eventSuggestion: safeText(parsed?.eventSuggestion, 240).trim(),
+      memories: Array.isArray(parsed?.memories) ? parsed.memories.slice(0,4) : [],
+      intentions: Array.isArray(parsed?.intentions) ? parsed.intentions.slice(0,3) : [],
     };
   } catch {
     return null;
@@ -261,12 +268,18 @@ async function loadContext(userId, contact) {
   const occupation=character?.occupation||advanced?.identity?.occupation||'';
   const city=character?.location||advanced?.identity?.city||contact?.city||save?.identity?.city||'';
   const routine=character?.routine||advanced?.world?.schedule||null;
+  const characterKey=characterMemoryKey(contact,character);
   const lifeState=resolveRoutineState(routine,new Date(clock.game_now),{
     occupation,city,timezone:clock.timezone||'UTC',
-    characterKey:String(character?.id||contact?.npcId||contact?.id||contact?.name||'npc'),
+    characterKey,
     seed:String(Date.now())
   });
-  return { save, character, events: eventList, phoneActivity: activity.rows || [], clock, lifeState, playerContext: playerContextResult.rows[0] || null, playerLocation: playerLocationResult.rows[0] || null };
+  const mindContext=await loadMindContext(userId,characterKey,new Date(clock.game_now));
+  return {
+    save, character, characterKey, memoryConfig:advanced?.memory||{}, mindContext,
+    events:eventList,phoneActivity:activity.rows||[],clock,lifeState,
+    playerContext:playerContextResult.rows[0]||null,playerLocation:playerLocationResult.rows[0]||null
+  };
 }
 
 async function saveWorld(userId, save) {
@@ -421,6 +434,7 @@ export async function POST(request) {
       lifeState: context.lifeState,
       playerContext: context.playerContext,
       playerLocation: context.playerLocation,
+      mindContext: context.mindContext,
     });
 
     const reply = modelResult?.reply || centralReply({
@@ -453,6 +467,18 @@ export async function POST(request) {
     const delta = modelResult?.relationshipDeltas && Object.keys(modelResult.relationshipDeltas).length
       ? modelResult.relationshipDeltas
       : relationshipDeltas(text);
+
+    const mindUpdate=await persistExchangeMind({
+      userId:user.id,
+      characterKey:context.characterKey,
+      gameNow:new Date(context.clock.game_now),
+      playerText:text,
+      npcReply:reply,
+      modelResult,
+      memoryConfig:context.memoryConfig,
+      sourceRef:String(messageRef)
+    });
+    await forgetLowValueMemories(user.id,context.characterKey,new Date(context.clock.game_now),context.memoryConfig);
 
     if (context.character) {
       const updated = applyDeltas(context.character, delta);
@@ -499,6 +525,8 @@ export async function POST(request) {
         lifeState:context.lifeState,
         centralEngine: true,
         modelBacked: Boolean(modelResult),
+        memoriesCreated:mindUpdate.memories.length,
+        intentionsCreated:mindUpdate.intentions.length,
       })]
     );
 
@@ -509,6 +537,7 @@ export async function POST(request) {
       queued:Boolean(pending),
       deliverAfter:pending?.deliver_after||null,
       lifeState:context.lifeState,
+      memory:{created:mindUpdate.memories.length,intentionsCreated:mindUpdate.intentions.length},
       engine:modelResult?'central_ai':'director_fallback',
     });
   } catch (error) {
