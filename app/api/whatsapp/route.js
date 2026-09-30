@@ -493,10 +493,13 @@ export async function POST(request) {
     );
 
     return NextResponse.json({
-      ok: true,
-      sent: compactMessages([sent])[0],
-      reply: compactMessages([received])[0],
-      engine: modelResult ? 'central_ai' : 'director_fallback',
+      ok:true,
+      sent:compactMessages([sent])[0],
+      reply:received?compactMessages([received])[0]:null,
+      queued:Boolean(pending),
+      deliverAfter:pending?.deliver_after||null,
+      lifeState:context.lifeState,
+      engine:modelResult?'central_ai':'director_fallback',
     });
   } catch (error) {
     console.error('whatsapp_write_failed', error);
