@@ -106,7 +106,7 @@ export default function ContactsApp({onClose}){
    return <div className="native-contacts">
      <NativeBar left="‹ Contactos" onLeft={()=>setMode('list')} title="" right="Editar" onRight={()=>editContact(c)}/>
      <div className="nc-scroll nc-detail">
-       <div className="nc-contact-hero"><Avatar contact={c} size="hero"/><h2>{c.name}</h2><p>{[c.city,c.age?c.age+' años':''].filter(Boolean).join(' · ')}</p><span className="nc-source-badge">{c.sourceType||'Persona real'}</span></div>
+       <div className="nc-contact-hero"><Avatar contact={c} size="hero"/><h2>{c.name}</h2><p>{[c.city,c.age?c.age+' años':''].filter(Boolean).join(' · ')}</p>{!c.hideSourceType&&<span className="nc-source-badge">{c.sourceType||'Persona real'}</span>}</div>
        <div className="nc-quick-actions"><button><i>✉</i><span>mensaje</span></button><button><i>☎</i><span>llamar</span></button><button><i>☆</i><span>favorito</span></button></div>
        <Group>
          <Info label="Relación" value={c.relationshipType}/>
