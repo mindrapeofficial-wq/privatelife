@@ -229,6 +229,32 @@ export default function AdminPage(){
       meta:'AUTONOMÍA NPC'
     }));
 
+    lifeMemories.forEach(m=>push({
+      id:'memory:'+m.id,kind:'ai',source:'MEMORIA NPC',at:m.lastRecalledGameAt||m.occurredGameAt,
+      title:'Un personaje conserva un recuerdo',
+      text:String(m.summary||'Recuerdo persistente sin descripción.'),
+      meta:String(m.characterKey||'NPC')+' · importancia '+String(m.importance??'—')+' · '+String(m.status||'active')
+    }));
+
+    lifeIntentions.forEach(intent=>push({
+      id:'intention:'+intent.id,kind:'ai',source:'INTENCIÓN NPC',at:intent.createdGameAt||intent.notBeforeGameAt,
+      title:'Un personaje mantiene una intención '+String(intent.status||'pending'),
+      text:String(intent.summary||'Intención narrativa sin descripción.'),
+      meta:String(intent.characterKey||'NPC')+' · prioridad '+String(intent.priority??'—')
+    }));
+
+    if(playerContext?.updated_at)push({
+      id:'context:'+String(playerContext.revision||playerContext.updated_at),kind:'player',source:'CONTEXTO',at:playerContext.updated_at,
+      title:'El jugador cambió su situación actual',
+      text:[playerContext.location_label,playerContext.activity_label,playerContext.availability].filter(Boolean).join(' · ')||'Contexto del jugador actualizado.'
+    });
+
+    if(worldLocation?.updated_at)push({
+      id:'location:'+String(worldLocation.updated_at),kind:'player',source:'UBICACIÓN',at:worldLocation.updated_at,
+      title:'Se actualizó la zona geográfica del jugador',
+      text:String(worldLocation.display_label||worldLocation.city||'Ubicación actualizada.')
+    });
+
     events.forEach(ev=>push({
       id:'world-save:'+ev.id,kind:'world',source:'EVENTO',at:ev.createdAt,
       title:'Evento narrativo '+String(ev.status||'pendiente'),
@@ -288,7 +314,7 @@ export default function AdminPage(){
     });
 
     return out.sort((a,b)=>new Date(b.at).getTime()-new Date(a.at).getTime()).slice(0,900);
-  },[phoneActivity,phoneWhatsapp,lifeEvents,lifeAutonomyEvents,events,save.world?.directorLog,save.identity?.name,aiRuns]);
+  },[phoneActivity,phoneWhatsapp,lifeEvents,lifeAutonomyEvents,lifeMemories,lifeIntentions,playerContext,worldLocation,events,save.world?.directorLog,save.identity?.name,aiRuns]);
   const visibleConsoleEntries=useMemo(()=>{
     const q=consoleQuery.trim().toLowerCase();
     return consoleEntries.filter(x=>(consoleFilter==='all'||x.kind===consoleFilter)&&(!q||[x.source,x.title,x.text,x.meta].some(v=>String(v||'').toLowerCase().includes(q))));
