@@ -4,6 +4,110 @@ import { useMemo, useState } from 'react';
 
 export const APP_STORE_CATALOG = [
   {
+    id:'instagram',
+    name:'Instagram',
+    openName:'Instagram',
+    developer:'Instagram',
+    category:'Social',
+    description:'Comparte momentos y conecta con perfiles dentro de tu vida digital.',
+    longDescription:'Restaura Instagram en la pantalla de inicio del teléfono.',
+    icon:'/phone/instagram.webp',
+    available:true,
+    featured:false,
+    signals:{}
+  },
+  {
+    id:'whatsapp',
+    name:'WhatsApp',
+    openName:'WhatsApp',
+    developer:'WhatsApp LLC',
+    category:'Social',
+    description:'Mensajes y conversaciones con tus contactos.',
+    longDescription:'Restaura WhatsApp en la pantalla de inicio para volver a acceder a tus conversaciones.',
+    glyph:'☎',
+    available:true,
+    featured:false,
+    signals:{}
+  },
+  {
+    id:'facebook',
+    name:'Facebook',
+    openName:'Facebook',
+    developer:'Meta',
+    category:'Social',
+    description:'La red social interna para conocer y hablar con otros jugadores.',
+    longDescription:'Restaura Facebook y recupera el acceso a tu red de amigos, publicaciones y chats.',
+    glyph:'f',
+    available:true,
+    featured:false,
+    signals:{}
+  },
+  {
+    id:'private-life',
+    name:'Private Life',
+    openName:'Private Life',
+    developer:'Private Life',
+    category:'Juego',
+    description:'Acceso a la capa narrativa principal de tu vida.',
+    longDescription:'Restaura el acceso directo de Private Life en la pantalla de inicio.',
+    glyph:'PL',
+    available:true,
+    featured:false,
+    signals:{}
+  },
+  {
+    id:'phone',
+    name:'Teléfono',
+    openName:'Teléfono',
+    developer:'Private Life System',
+    category:'Utilidades',
+    description:'Llamadas y acceso telefónico desde el dock.',
+    longDescription:'Restaura la aplicación Teléfono en el dock.',
+    icon:'/phone/phone.webp',
+    available:true,
+    featured:false,
+    signals:{}
+  },
+  {
+    id:'messages',
+    name:'Mensajes',
+    openName:'Mensajes',
+    developer:'Private Life System',
+    category:'Social',
+    description:'Mensajería directa desde el dock.',
+    longDescription:'Restaura Mensajes en el dock.',
+    icon:'/phone/messages.webp',
+    available:true,
+    featured:false,
+    signals:{}
+  },
+  {
+    id:'safari',
+    name:'Safari',
+    openName:'Safari',
+    developer:'Private Life System',
+    category:'Utilidades',
+    description:'Navegador del teléfono.',
+    longDescription:'Restaura Safari en el dock.',
+    glyph:'◈',
+    available:true,
+    featured:false,
+    signals:{}
+  },
+  {
+    id:'music',
+    name:'Música',
+    openName:'Música',
+    developer:'Private Life System',
+    category:'Música',
+    description:'Tu acceso a música desde el dock.',
+    longDescription:'Restaura Música en el dock.',
+    glyph:'♪',
+    available:true,
+    featured:false,
+    signals:{}
+  },
+  {
     id:'tinder',
     name:'Tinder',
     developer:'Tinder LLC',
@@ -119,8 +223,7 @@ export default function PhoneAppStore({installed=[],onInstall,onOpenApp,onClose}
 
   async function action(app){
     if(installedSet.has(app.id)){
-      if(app.id==='tinder')onOpenApp?.('Tinder');
-      else if(app.id==='grindr')onOpenApp?.('Grindr');
+      onOpenApp?.(app.openName||app.name);
       return;
     }
     if(!app.available)return;
