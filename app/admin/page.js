@@ -11,6 +11,79 @@ async function api(url,options={}){
   return data;
 }
 function uid(){return globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2)+Date.now().toString(36)}
+function pick(list){return list[Math.floor(Math.random()*list.length)]}
+function between(min,max){return Math.floor(min+Math.random()*(max-min+1))}
+function bounded(n,min=0,max=100){return Math.max(min,Math.min(max,Math.round(n)))}
+
+const PROCEDURAL_NAMES=[
+  'Irene','Lucía','Claudia','Marta','Alba','Sara','Natalia','Elena','Carla','Nerea','Andrea','Paula',
+  'Álvaro','Marcos','Adrián','Hugo','Sergio','Diego','Javier','Mario','Rubén','Lucas','Álex','Bruno'
+];
+const PROCEDURAL_ARCHETYPES=[
+  {
+    id:'social',
+    roles:['amistad potencial','conocido del entorno social','persona que coincide en un plan','nuevo contacto'],
+    jobs:['relaciones públicas','camarero/a','dependiente/a','community manager','organizador/a de eventos'],
+    personality:'Extrovertido/a, observador/a y con facilidad para entrar en conversación. Busca estímulo social, pero no entrega confianza completa de inmediato.',
+    communication:'Mensajes ágiles, tono cercano, humor rápido y cierta tendencia a improvisar. Si percibe frialdad, baja el ritmo antes de insistir.',
+    objectives:'Ampliar su círculo, encontrar planes interesantes y comprobar si el jugador encaja de verdad en su vida cotidiana.',
+    boundaries:'No tolera control, insistencia repetida ni invasiones de privacidad. Necesita reciprocidad para mantener el interés.',
+    secrets:['Está intentando dejar atrás una amistad complicada.','Tiene una oportunidad laboral que podría hacerle cambiar de ciudad.','Oculta que conoce indirectamente a alguien del entorno del jugador.'],
+    traitBase:{confianza:48,atraccion:32,apego:25,tension:28,sospecha:30,celos:18,curiosidad:72,resentimiento:8}
+  },
+  {
+    id:'reserved',
+    roles:['vecino/a','conocido/a recurrente','amistad lenta','contacto del barrio'],
+    jobs:['administrativo/a','bibliotecario/a','técnico/a de laboratorio','diseñador/a','traductor/a'],
+    personality:'Reservado/a, sensible al detalle y bastante independiente. Tarda en mostrar interés, pero recuerda pequeños gestos y contradicciones.',
+    communication:'Escribe poco pero con intención. Prefiere conversaciones uno a uno y suele pensar antes de responder.',
+    objectives:'Mantener estabilidad, conocer a gente sin precipitar vínculos y proteger su espacio personal.',
+    boundaries:'Rechaza la presión emocional, las preguntas demasiado íntimas al principio y las situaciones públicas incómodas.',
+    secrets:['Guarda una decepción sentimental que casi nadie conoce.','Está preparando un cambio importante sin contárselo aún a su círculo.','Tiene una afición muy absorbente que suele ocultar al conocer gente.'],
+    traitBase:{confianza:35,atraccion:24,apego:30,tension:22,sospecha:48,celos:20,curiosidad:55,resentimiento:15}
+  },
+  {
+    id:'creative',
+    roles:['contacto creativo','persona del ambiente cultural','colaborador/a potencial','amistad por intereses comunes'],
+    jobs:['fotógrafo/a','músico/a','ilustrador/a','productor/a audiovisual','tatuador/a','diseñador/a gráfico/a'],
+    personality:'Creativo/a, curioso/a y emocionalmente expresivo/a. Se entusiasma con ideas nuevas y puede alternar periodos de mucha energía con necesidad de desconexión.',
+    communication:'Usa referencias, audios, bromas y mensajes espontáneos. Suele hablar de proyectos y experiencias más que de formalidades.',
+    objectives:'Encontrar personas estimulantes, impulsar proyectos propios y vivir experiencias que rompan la rutina.',
+    boundaries:'Detesta que trivialicen su trabajo, la manipulación emocional y sentirse utilizado/a como contacto o recurso.',
+    secrets:['Tiene un proyecto personal que todavía no se atreve a enseñar.','Arrastra una deuda pequeña relacionada con un proyecto fallido.','Ha tenido una relación profesional que terminó muy mal.'],
+    traitBase:{confianza:44,atraccion:36,apego:34,tension:34,sospecha:28,celos:24,curiosidad:82,resentimiento:14}
+  },
+  {
+    id:'pragmatic',
+    roles:['contacto profesional','compañero/a de trabajo','cliente o colaborador/a','conocido/a útil que puede volverse cercano'],
+    jobs:['comercial','gestor/a','enfermero/a','abogado/a','técnico/a informático/a','responsable de tienda'],
+    personality:'Pragmático/a, directo/a y bastante estable. Valora que las acciones coincidan con las palabras y evita dramas innecesarios.',
+    communication:'Mensajes claros, concretos y educados. Puede parecer frío/a al principio, aunque responde bien a la honestidad y al humor seco.',
+    objectives:'Mejorar su situación profesional, conservar autonomía y construir relaciones fiables sin perder tiempo en ambigüedades.',
+    boundaries:'No acepta promesas incumplidas, juegos de celos ni demandas constantes de atención.',
+    secrets:['Está valorando abandonar su trabajo sin que nadie lo sepa.','Tiene un conflicto familiar que mantiene separado de su vida social.','Una decisión profesional pasada todavía puede volver a complicarle la vida.'],
+    traitBase:{confianza:52,atraccion:28,apego:28,tension:20,sospecha:38,celos:14,curiosidad:46,resentimiento:12}
+  },
+  {
+    id:'intense',
+    roles:['encuentro inesperado','amistad magnética','persona de carácter fuerte','nuevo contacto imprevisible'],
+    jobs:['entrenador/a personal','artista escénico/a','bartender','emprendedor/a','periodista','creador/a de contenido'],
+    personality:'Intenso/a, seguro/a en apariencia y muy reactivo/a a la química interpersonal. Le aburren las relaciones planas y busca emociones claras.',
+    communication:'Directo/a, expresivo/a y cambiante. Puede contestar con mucha energía y desaparecer unas horas si siente pérdida de interés.',
+    objectives:'Vivir experiencias fuertes, evitar la rutina y descubrir hasta dónde puede llegar una conexión interesante.',
+    boundaries:'No tolera humillaciones, indiferencia deliberada ni sentirse controlado/a. Puede retirarse bruscamente si interpreta deslealtad.',
+    secrets:['Mantiene contacto esporádico con una expareja.','Ha exagerado una parte de su vida para proteger su imagen.','Tiene una rivalidad personal que podría cruzarse con la historia.'],
+    traitBase:{confianza:42,atraccion:40,apego:31,tension:48,sospecha:36,celos:38,curiosidad:74,resentimiento:22}
+  }
+];
+const PROCEDURAL_APPEARANCES=[
+  'Rostro expresivo, estilo urbano cuidado y apariencia natural. Suele vestir de forma sencilla pero deliberada; transmite seguridad sin buscar llamar demasiado la atención.',
+  'Aspecto limpio y contemporáneo, cabello cuidado y lenguaje corporal tranquilo. Su forma de vestir prioriza comodidad con algunos detalles personales reconocibles.',
+  'Presencia llamativa sin ser extravagante, mirada muy comunicativa y estilo flexible entre casual y arreglado según el contexto.',
+  'Apariencia discreta, gestos contenidos y estética práctica. Resulta más memorable por la expresión y la forma de moverse que por accesorios concretos.',
+  'Estética creativa, pequeños detalles personales en ropa o accesorios y una presencia visual que cambia bastante según el ambiente.'
+];
+
 function world(save={}){
   return {...save,world:{characters:[],events:[],directorLog:[],...(save.world||{}),
     characters:Array.isArray(save.world?.characters)?save.world.characters:[],
@@ -81,9 +154,55 @@ export default function AdminPage(){
       setNotice('Cambios guardados.');await loadUsers(player.id);setTimeout(()=>setNotice(''),1500);
     }catch(e){setNotice(e.message)}finally{setBusy(false)}
   }
-  function addCharacter(name='Nuevo personaje'){
-    const c={id:uid(),name,age:18,status:'activo',origin:'director',role:'',occupation:'',location:'',appearance:'',personality:'',communication:'',objectives:'',boundaries:'',secrets:'',notes:'',traits:Object.fromEntries(TRAITS.map(t=>[t,50])),createdAt:new Date().toISOString()};
-    const next=structuredClone(save);next.world.characters.unshift(c);setPlayer(cur=>({...cur,save:next}));setCharId(c.id);return next;
+  function proceduralCharacter(forcedName=''){
+    const archetype=pick(PROCEDURAL_ARCHETYPES);
+    const playerAge=Math.max(18,Number(save.identity?.age)||30);
+    const age=bounded(playerAge+between(-9,9),18,70);
+    const city=String(save.identity?.city||'').trim();
+    const location=city?pick([
+      city+' · zona centro',
+      city+' · barrio residencial',
+      city+' · entorno laboral',
+      city+' · cafetería habitual',
+      city+' · gimnasio / actividad',
+      city+' · evento o espacio social'
+    ]):pick(['zona centro','entorno laboral','cafetería habitual','gimnasio / actividad','evento o espacio social']);
+    const jitter=()=>between(-13,13);
+    const traits=Object.fromEntries(TRAITS.map(t=>[t,bounded((archetype.traitBase[t]??50)+jitter(),3,96)]));
+    const name=String(forcedName||'').trim()||pick(PROCEDURAL_NAMES);
+    const secret=pick(archetype.secrets);
+    return {
+      id:uid(),
+      name,
+      age,
+      status:'activo',
+      origin:'procedural',
+      role:pick(archetype.roles),
+      occupation:pick(archetype.jobs),
+      location,
+      appearance:pick(PROCEDURAL_APPEARANCES),
+      personality:archetype.personality,
+      communication:archetype.communication,
+      objectives:archetype.objectives,
+      boundaries:archetype.boundaries,
+      secrets:secret,
+      notes:'Generado proceduralmente por Director AI. Arquetipo interno: '+archetype.id+'. La ficha puede evolucionar según las decisiones del jugador; ningún parámetro inicial es un destino fijo.',
+      traits,
+      procedural:{
+        archetype:archetype.id,
+        generatedAt:new Date().toISOString(),
+        playerContext:{city:city||null,age:playerAge}
+      },
+      createdAt:new Date().toISOString()
+    };
+  }
+  function addCharacter(name=''){
+    const c=proceduralCharacter(name);
+    const next=structuredClone(save);
+    next.world.characters.unshift(c);
+    setPlayer(cur=>({...cur,save:next}));
+    setCharId(c.id);
+    return next;
   }
   function patchCharacter(patch){if(!character)return;localEdit(next=>{next.world.characters=next.world.characters.map(c=>c.id===character.id?{...c,...patch}:c)})}
   function patchTrait(trait,value){if(!character)return;localEdit(next=>{next.world.characters=next.world.characters.map(c=>c.id===character.id?{...c,traits:{...(c.traits||{}),[trait]:Number(value)}}:c)})}
@@ -102,7 +221,7 @@ export default function AdminPage(){
     const m=prompt.match(/(?:crea|añade|mete)(?: un| una)? personaje(?: nuevo)?(?: llamado| llamada)?\s+([^,.]+)/i);
     if(m){
       const name=m[1].trim().slice(0,60),next=addCharacter(name);await persist(next,'Personaje creado: '+name);
-      setChat(v=>[...v,{role:'ai',text:`He creado a ${name}. Su ficha ya está disponible para ajustar apariencia, personalidad, parámetros y secretos.`}]);setTab('characters');return;
+      setChat(v=>[...v,{role:'ai',text:`He creado proceduralmente a ${name}. Ya tiene edad, rol, profesión, ubicación, apariencia, personalidad, comunicación, objetivos, límites, secreto y parámetros internos coherentes.`}]);setTab('characters');return;
     }
     const ev=prompt.match(/(?:programa|crea|añade|lanza)(?: un)? evento[:\s]+(.+)/i);
     if(ev){await addEvent(ev[1]);setChat(v=>[...v,{role:'ai',text:'Evento añadido a la cola narrativa. El jugador no verá que procede del panel.'}]);setTab('events');return}
@@ -160,9 +279,9 @@ export default function AdminPage(){
         </div>}
 
         {tab==='characters'&&<div className="admin-character-layout">
-          <section className="admin-card admin-character-list"><div className="admin-card-head"><span>PERSONAJES</span><button onClick={()=>addCharacter()}>+ Añadir</button></div>
+          <section className="admin-card admin-character-list"><div className="admin-card-head"><span>PERSONAJES</span><button disabled={busy} onClick={async()=>{const next=addCharacter();const created=next.world.characters[0];await persist(next,'Personaje procedural creado: '+created.name)}}>✦ Generar</button></div>
             {chars.map(c=><button key={c.id} className={'admin-character-row '+(character?.id===c.id?'active':'')} onClick={()=>setCharId(c.id)}><span className="admin-avatar">{(c.name||'?').slice(0,1).toUpperCase()}</span><span><b>{c.name||'Sin nombre'}</b><small>{c.status||'activo'} · {c.origin||'procedural'}</small></span></button>)}
-            {!chars.length&&<div className="admin-empty">No hay NPC todavía. Créalo aquí o desde Director IA.</div>}
+            {!chars.length&&<div className="admin-empty">No hay NPC todavía. Pulsa “Generar” para crear una ficha procedural completa o pídeselo a Director IA.</div>}
           </section>
           <section className="admin-card admin-character-sheet">{!character?<div className="admin-empty large">Selecciona o crea un personaje.</div>:<>
             <div className="admin-card-head"><span>FICHA MAESTRA</span><button disabled={busy} onClick={()=>persist(save,'Ficha de '+character.name+' modificada')}>Guardar ficha</button></div>
