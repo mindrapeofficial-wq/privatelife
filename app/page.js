@@ -251,7 +251,7 @@ function AppWindow({name,onClose,authUser,logout}){
  if(name==='Facebook')return <div className="app-window app-facebook native-window"><FacebookApp onClose={onClose}/></div>;
  if(name==='Ajustes')return <div className="app-window app-ajustes native-settings-window"><Status/><SettingsApp onClose={onClose} authUser={authUser} logout={logout}/><button className="home-gesture-button" aria-label="Volver al inicio" onClick={onClose}><span/></button></div>;
  return <div className={'app-window app-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}>
-   <Status/><div className="app-window-head"><button onClick={onClose}>‹</button><b>{name}</b><span/></div>
+   <Status/><div className="app-window-head"><button className="app-window-back pl-unified-back" aria-label="Volver" onClick={onClose}>‹</button><b>{name}</b><span/></div>
    <div className="app-window-content"><div className="app-window-title">{name}</div><div className="fake-card"/><div className="fake-row"/><div className="fake-row short"/><div className="fake-row"/></div>
    <button className="home-gesture-button" aria-label="Volver al inicio" onClick={onClose}><span/></button>
  </div>
@@ -318,7 +318,7 @@ function SettingsApp({onClose,authUser,logout}){
    </div>
  </div>
 }
-function SettingsNav({title,onBack}){return <div className="settings-nav"><button onClick={onBack}>‹</button><b>{title}</b><span/></div>}
+function SettingsNav({title,onBack}){return <div className="settings-nav"><button className="settings-back pl-unified-back" aria-label="Volver" onClick={onBack}>‹</button><b>{title}</b><span/></div>}
 function SettingsRow({icon,label,onClick}){return <button className="settings-row" onClick={onClick}><i>{icon}</i><span>{label}</span><em>›</em></button>}
 function SettingsValue({label,value}){return <div className="settings-row settings-value"><span>{label}</span><b>{value}</b></div>}
 function SettingsToggle({icon,label,checked,onChange}){return <label className="settings-row settings-toggle"><i>{icon}</i><span>{label}</span><input type="checkbox" checked={checked} onChange={e=>onChange(e.target.checked)}/><u/></label>}
