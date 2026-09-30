@@ -91,7 +91,7 @@ function world(save={}){
     directorLog:Array.isArray(save.world?.directorLog)?save.world.directorLog:[]}};
 }
 function fmt(v){if(!v)return '—';try{return new Intl.DateTimeFormat('es-ES',{dateStyle:'medium',timeStyle:'short'}).format(new Date(v))}catch{return String(v)}}
-function phoneEventText(ev){const names={phone_home:'Entró al inicio',open_app:'Abrió',close_app:'Cerró',home_page:'Cambió de escritorio',unlock:'Desbloqueó el teléfono',lock:'Bloqueó el teléfono',visibility:'Estado de la app',screen_change:'Cambió de pantalla',logout:'Cerró sesión'};const prefix=names[ev?.type]||String(ev?.type||'Actividad').replaceAll('_',' ');return ev?.label?prefix+' · '+ev.label:prefix}
+function phoneEventText(ev){const names={phone_home:'Entró al inicio',open_app:'Abrió',close_app:'Cerró',home_page:'Cambió de escritorio',unlock:'Desbloqueó el teléfono',lock:'Bloqueó el teléfono',visibility:'Estado de la app',screen_change:'Cambió de pantalla',logout:'Cerró sesión',whatsapp_exchange:'Conversación WhatsApp',whatsapp_message_sent:'WhatsApp enviado',whatsapp_message_received:'WhatsApp recibido',whatsapp_photo_sent:'Foto por WhatsApp',narrative_event:'Evento narrativo'};const prefix=names[ev?.type]||String(ev?.type||'Actividad').replaceAll('_',' ');return ev?.label?prefix+' · '+ev.label:prefix}
 function phoneAppIcon(name){const icons={Instagram:'/phone/instagram.webp',Tinder:'/phone/tinder.webp',Grindr:'/phone/grindr.webp',Contactos:'/phone/contacts.webp',Fotos:'/phone/photos.webp',Calendario:'/phone/calendar.webp',Notas:'/phone/notes.webp',Ajustes:'/phone/settings.webp','Teléfono':'/phone/phone.webp',Mensajes:'/phone/messages.webp'};return icons[name]||''}
 
 export default function AdminPage(){
@@ -134,7 +134,7 @@ export default function AdminPage(){
   const save=player?.save?world(player.save):world({});
   const chars=save.world.characters,events=save.world.events;
   const character=useMemo(()=>chars.find(x=>x.id===charId)||chars[0]||null,[chars,charId]);
-  const phone=player?.phone||{state:{},activity:[],updatedAt:null},phoneState=phone.state||{},phoneActivity=Array.isArray(phone.activity)?phone.activity:[];
+  const phone=player?.phone||{state:{},activity:[],whatsapp:[],updatedAt:null},phoneState=phone.state||{},phoneActivity=Array.isArray(phone.activity)?phone.activity:[],phoneWhatsapp=Array.isArray(phone.whatsapp)?phone.whatsapp:[];
   const phoneFresh=phone.updatedAt&&Date.now()-new Date(phone.updatedAt).getTime()<12000&&phoneState.visibility!=='offline';
   const installedPhoneApps=['Instagram','WhatsApp','Facebook',...(save.datingApps?.tinder?['Tinder']:[]),...(save.datingApps?.grindr?['Grindr']:[]),'Contactos','Fotos','Calendario','App Store','Notas','Ajustes','Teléfono','Mensajes','Safari','Música'];
 
@@ -255,6 +255,25 @@ export default function AdminPage(){
       const name=m[1].trim().slice(0,60),next=addCharacter(name);await persist(next,'Personaje creado: '+name);
       setChat(v=>[...v,{role:'ai',text:`He creado proceduralmente a ${name}. Ya tiene edad, rol, profesión, ubicación, apariencia, personalidad, comunicación, objetivos, límites, secreto y parámetros internos coherentes.`}]);setTab('characters');return;
     }
+    const whatsappMatch=prompt.match(/(?:manda|env[ií]a|escribe)(?: un)? whatsapp a\s+([^:]{1,80}):\s*(.+)/i);
+    if(whatsappMatch){
+      const contactName=whatsappMatch[1].trim().slice(0,80),message=whatsappMatch[2].trim().slice(0,2000);
+      const next=structuredClone(save);
+      next.world.events.unshift({
+        id:uid(),
+        description:'WhatsApp de '+contactName+': '+message,
+        status:'pendiente',
+        trigger:'director',
+        channel:'whatsapp',
+        contactName,
+        message,
+        createdAt:new Date().toISOString()
+      });
+      await persist(next,'WhatsApp programado para '+contactName);
+      setChat(v=>[...v,{role:'ai',text:'He dejado preparado un WhatsApp de '+contactName+'. Se entregará de forma invisible cuando el teléfono del jugador sincronice.'}]);
+      setTab('phone');
+      return;
+    }
     const ev=prompt.match(/(?:programa|crea|añade|lanza)(?: un)? evento[:\s]+(.+)/i);
     if(ev){await addEvent(ev[1]);setChat(v=>[...v,{role:'ai',text:'Evento añadido a la cola narrativa. El jugador no verá que procede del panel.'}]);setTab('events');return}
     setChat(v=>[...v,{role:'ai',text:'Puedo resumir la partida, crear personajes y programar eventos. También puedes editar manualmente cualquier ficha.'}]);
@@ -307,6 +326,8 @@ export default function AdminPage(){
             <dl className="admin-dl admin-phone-facts"><div><dt>Estado</dt><dd>{phoneFresh?'Conectado':'Desconectado / inactivo'}</dd></div><div><dt>Pantalla</dt><dd>{phoneState.locked?'Bloqueo':phoneState.currentApp||phoneState.stage||'—'}</dd></div><div><dt>Visibilidad</dt><dd>{phoneState.visibility||'—'}</dd></div><div><dt>Última señal</dt><dd>{fmt(phone.updatedAt)}</dd></div></dl>
             <div className="admin-card-head sub"><span>CRONOLOGÍA</span></div>
             <div className="admin-phone-activity">{phoneActivity.map(ev=><div className="admin-phone-event" key={ev.id}><i/><div><b>{phoneEventText(ev)}</b><small>{fmt(ev.createdAt)}</small></div></div>)}{!phoneActivity.length&&<div className="admin-empty">Aún no hay actividad registrada. Aparecerá en cuanto el jugador use el teléfono.</div>}</div>
+            <div className="admin-card-head sub"><span>WHATSAPP · CONVERSACIONES</span></div>
+            <div className="admin-wa-stream">{phoneWhatsapp.slice(0,40).map(m=><div className={'admin-wa-line '+m.side} key={m.id}><div><b>{m.contactName}</b><small>{m.side==='out'?'JUGADOR → CONTACTO':'CONTACTO → JUGADOR'} · {fmt(m.createdAt)}</small></div><p>{m.type==='image'?'[FOTO]':m.text||'—'}</p></div>)}{!phoneWhatsapp.length&&<div className="admin-empty">Todavía no hay conversaciones de WhatsApp sincronizadas.</div>}</div>
           </section>
         </div>}
 
@@ -336,7 +357,7 @@ export default function AdminPage(){
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>COLA NARRATIVA</span></div><div className="admin-event-list">{events.map(ev=><div key={ev.id} className="admin-event"><div><b>{ev.description}</b><small>{fmt(ev.createdAt)} · {ev.trigger||'manual'}</small></div><select value={ev.status||'pendiente'} onChange={e=>localEdit(next=>{next.world.events=next.world.events.map(x=>x.id===ev.id?{...x,status:e.target.value}:x)})}><option value="pendiente">Pendiente</option><option value="activo">Activo</option><option value="cerrado">Cerrado</option></select></div>)}{!events.length&&<div className="admin-empty">No hay eventos programados.</div>}</div><button className="admin-primary secondary" disabled={busy} onClick={()=>persist(save,'Estados de eventos actualizados')}>Guardar estados</button></section>
         </div>}
 
-        {tab==='director'&&<section className="admin-card admin-director"><div className="admin-card-head"><span>DIRECTOR IA · @{player.username}</span></div><div className="admin-chat">{chat.map((m,i)=><div key={i} className={'admin-message '+m.role}><b>{m.role==='ai'?'DIRECTOR AI':'ADMIN'}</b><p>{m.text}</p></div>)}</div><form className="admin-chat-form" onSubmit={sendDirector}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} placeholder="Ej.: Ponte al día · Crea personaje llamado Irene · Programa evento: ..."/><button disabled={!chatDraft.trim()||busy}>Enviar</button></form></section>}
+        {tab==='director'&&<section className="admin-card admin-director"><div className="admin-card-head"><span>DIRECTOR IA · @{player.username}</span></div><div className="admin-chat">{chat.map((m,i)=><div key={i} className={'admin-message '+m.role}><b>{m.role==='ai'?'DIRECTOR AI':'ADMIN'}</b><p>{m.text}</p></div>)}</div><form className="admin-chat-form" onSubmit={sendDirector}><input value={chatDraft} onChange={e=>setChatDraft(e.target.value)} placeholder="Ej.: Ponte al día · Crea personaje llamado Irene · Manda WhatsApp a Irene: ¿Dónde estás? · Programa evento: ..."/><button disabled={!chatDraft.trim()||busy}>Enviar</button></form></section>}
       </>}
     </section>
   </main>
