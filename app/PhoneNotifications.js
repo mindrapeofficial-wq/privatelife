@@ -123,9 +123,7 @@ export default function PhoneNotifications(){
         const contacts=Array.isArray(raw)?raw:[];
         const luisa=contacts.find(c=>{
           const name=normalize(c?.name||'');
-          const source=normalize(c?.sourceType||c?.kind||'');
-          const npc=Boolean(c?.npcId)||c?.isAI===true||source.includes('personaje')||source.includes('npc')||source==='ia';
-          return npc&&(name==='luisa'||name.startsWith('luisa '));
+          return name==='luisa'||name.startsWith('luisa ');
         });
         if(!luisa||Number(luisa.age)<18)return;
         const contact={
