@@ -51,7 +51,9 @@ public class PrivateLifeFirebaseMessagingService extends FirebaseMessagingServic
             detail.put("app", app);
             detail.put("title", title);
             detail.put("body", body);
-            detail.put("createdAt", java.time.Instant.now().toString());
+            java.text.SimpleDateFormat iso = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US);
+            iso.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            detail.put("createdAt", iso.format(new java.util.Date()));
             detail.put("priority", "high");
 
             extra.put("eventType", eventType);
