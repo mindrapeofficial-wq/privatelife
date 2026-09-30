@@ -39,3 +39,46 @@
 .admin-empty{color:#70798b;font-size:12px;padding:14px 9px}.admin-empty.large{min-height:280px;display:grid;place-items:center;border:1px dashed #2a2f39;border-radius:15px}
 @media(max-width:900px){.admin-shell{grid-template-columns:1fr}.admin-sidebar{position:relative;min-height:auto}.admin-player-list{max-height:230px}.admin-main{padding:20px 14px 40px}.admin-grid,.admin-character-layout{grid-template-columns:1fr}.admin-wide{grid-column:auto}.admin-traits{grid-template-columns:1fr}.admin-header{align-items:flex-start}.admin-kpis{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:560px){.admin-main{padding:16px 10px 35px}.admin-header h1{font-size:22px}.admin-status{display:none}.admin-tabs{overflow:auto}.admin-card{padding:13px}.admin-kpis{grid-template-columns:1fr}.admin-form-grid{grid-template-columns:1fr}.admin-traits label{grid-template-columns:112px minmax(70px,1fr) 30px}.admin-message{max-width:90%}}
+
+
+/* PRIVATE LIFE PHONE REALISM V2 */
+.realistic-home,.realistic-lock{position:relative;height:100%;overflow:hidden;background:#05070a;color:#fff}
+.wallpaper-layer{position:absolute;inset:-2px;background:url('/phone/wallpaper.webp') center center/cover no-repeat;transform:scale(1.015)}
+.home-shade{position:absolute;inset:0;background:linear-gradient(180deg,#0005 0,#0000 20%,#0000 64%,#0006 100%);pointer-events:none}
+.lock-shade{position:absolute;inset:0;background:linear-gradient(180deg,#0004,#0000 34%,#0004 100%);backdrop-filter:saturate(.92)}
+.realistic-home{animation:homeEnter .42s cubic-bezier(.16,1,.3,1)}
+@keyframes homeEnter{from{opacity:.55;transform:scale(1.065)}to{opacity:1;transform:scale(1)}}
+.realistic-lock .status,.realistic-home .status,.app-window .status{color:#fff;text-shadow:0 1px 3px #0008}
+.status{height:48px;padding:13px 20px 0;font-size:13px;align-items:flex-start}
+.status-icons{display:flex;align-items:center;gap:7px}
+.signal-bars{display:flex;align-items:end;gap:2px;height:12px}.signal-bars i{display:block;width:3px;background:#fff;border-radius:2px}.signal-bars i:nth-child(1){height:4px}.signal-bars i:nth-child(2){height:6px}.signal-bars i:nth-child(3){height:9px}.signal-bars i:nth-child(4){height:12px}
+.wifi-glyph{font-size:14px;line-height:10px;transform:translateY(-1px)}
+.battery{position:relative;width:25px;height:12px;border:1.8px solid #fff;border-radius:4px;padding:2px}.battery:after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:5px;background:#fff;border-radius:0 2px 2px 0}.battery i{display:block;height:100%;width:78%;background:#fff;border-radius:2px}
+.realistic-lock .locktime{position:relative;padding-top:76px;font-size:78px;font-weight:300;letter-spacing:-.055em;text-shadow:0 2px 16px #0008}
+.realistic-lock .date{position:relative;margin-top:-3px;font-size:17px;font-weight:600;text-shadow:0 2px 8px #0009}
+.realistic-lock .locklogo{top:46%;width:min(48vw,185px);opacity:.74;mix-blend-mode:screen}
+.lock-actions{position:absolute;bottom:58px;left:24px;right:24px;display:flex;justify-content:space-between}.round-action{width:47px;height:47px;border-radius:50%;display:grid;place-items:center;background:#111b;backdrop-filter:blur(14px);font-size:22px}
+.realistic-lock .swipe{bottom:18px;font-size:11px;animation:none;color:#fff;text-shadow:0 1px 4px #000}.realistic-lock .swipe:before{content:"";display:block;width:126px;height:5px;border-radius:5px;background:#fff;margin:0 auto 9px}
+.real-account{z-index:17;top:49px!important;right:14px!important;left:auto!important;background:#1118!important;backdrop-filter:blur(12px);border-radius:14px;padding:5px 8px!important;font-size:9px!important}
+.real-account button{padding:4px 6px!important;font-size:8px!important}
+.home-slider-viewport{position:absolute;inset:48px 0 122px;overflow:hidden;touch-action:pan-y}
+.home-pages{display:flex;width:200%;height:100%;transition:transform .34s cubic-bezier(.22,.8,.24,1);will-change:transform}.home-pages.dragging{transition:none}
+.home-page{width:50%;flex:0 0 50%;padding:52px 18px 0}.second-page{padding-top:46px}
+.ios-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:26px 10px;align-items:start}.compact-grid{margin-top:26px}
+.ios-app{appearance:none;background:transparent!important;color:white!important;border:0!important;border-radius:0!important;padding:0!important;letter-spacing:0!important;font-weight:500!important;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.ios-app:active .ios-appicon{transform:scale(.86);filter:brightness(.78)}
+.ios-appicon{width:62px;height:62px;border-radius:15px;object-fit:contain;display:grid;place-items:center;transition:transform .12s ease,filter .12s ease;filter:drop-shadow(0 2px 4px #0005)}
+.ios-label{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:14px;text-shadow:0 1px 3px #000,0 0 6px #000b}
+.ios-dock{height:86px;bottom:19px;left:14px;right:14px;border:1px solid #ffffff22;background:#241d1b99;backdrop-filter:blur(28px) saturate(1.45);border-radius:29px;box-shadow:inset 0 1px #ffffff1f,0 8px 30px #0006;display:grid;grid-template-columns:repeat(4,1fr);padding:12px 9px;z-index:15}
+.ios-dock .ios-appicon{width:61px;height:61px;border-radius:15px}.dock-app{justify-content:center}
+.page-dots{position:absolute;z-index:14;bottom:114px;left:0;right:0;display:flex;justify-content:center;gap:8px}.page-dots i{width:7px;height:7px;background:#ffffff66;border-radius:50%;transition:.2s}.page-dots i.active{background:#fff;transform:scale(1.08)}
+.css-app.safari{background:radial-gradient(circle at center,#fff 0 46%,#1597e8 47% 100%);border:1px solid #fff9;position:relative}.compass-needle{width:9px;height:41px;background:linear-gradient(#f33 0 50%,#fff 50%);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);transform:rotate(42deg);filter:drop-shadow(0 1px 1px #0004)}
+.css-app.music{background:linear-gradient(145deg,#ff6a7a,#f8204b);font-size:42px;font-weight:700;padding-bottom:4px}
+.brand-icon{background:linear-gradient(145deg,#171717,#020202);border:1px solid #ffffff26;padding:7px;overflow:hidden}.brand-icon img{width:100%;height:100%;object-fit:contain}
+.clock-widget{height:165px;border-radius:27px;padding:22px;background:#1119;backdrop-filter:blur(25px) saturate(1.25);border:1px solid #ffffff22;box-shadow:0 12px 36px #0005;display:flex;flex-direction:column;justify-content:flex-end;text-shadow:0 1px 4px #000}.clock-widget span{font-size:10px;letter-spacing:.18em;color:#fff9}.clock-widget b{font-size:30px;margin-top:4px}.clock-widget small{font-size:12px;color:#fffc;margin-top:4px}
+.app-window{position:absolute;z-index:80;inset:0;background:#f4f4f7;color:#111;transform-origin:center 72%;animation:appOpen .36s cubic-bezier(.2,.8,.2,1);overflow:hidden}
+@keyframes appOpen{from{opacity:0;transform:scale(.25) translateY(45%);border-radius:60px}to{opacity:1;transform:scale(1) translateY(0);border-radius:0}}
+.app-window .status{color:#111;text-shadow:none}.app-window .signal-bars i,.app-window .battery i,.app-window .battery:after{background:#111}.app-window .battery{border-color:#111}
+.app-window-head{height:58px;padding:12px 16px 0;display:grid;grid-template-columns:44px 1fr 44px;align-items:center;text-align:center;border-bottom:1px solid #00000012}.app-window-head button{background:transparent;color:#1479ff;padding:8px;font-size:32px;line-height:1}.app-window-content{padding:24px}.app-window-title{font-size:34px;font-weight:800;margin-bottom:24px}.fake-card{height:180px;border-radius:24px;background:linear-gradient(145deg,#fff,#e3e4e8);box-shadow:0 10px 30px #00000010;margin-bottom:24px}.fake-row{height:52px;border-radius:15px;background:#fff;margin:10px 0;box-shadow:0 1px 0 #00000010}.fake-row.short{width:72%}
+.home-gesture-button{position:absolute;bottom:0;left:0;right:0;height:30px;background:transparent!important;padding:0!important}.home-gesture-button span{display:block;width:126px;height:5px;border-radius:6px;background:#111;margin:12px auto 0}
+@media(max-width:380px){.ios-appicon,.ios-dock .ios-appicon{width:55px;height:55px}.ios-grid{gap:22px 7px}.home-page{padding-left:13px;padding-right:13px}.ios-label{font-size:10px}.ios-dock{height:80px}.page-dots{bottom:107px}}

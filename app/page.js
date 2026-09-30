@@ -108,12 +108,78 @@ export default function Home(){
  if(step==='free')return <main className="wizard"><Progress n={5}/><h1>Algo que debamos saber de ti</h1><p className="muted">Cuéntanos lo que las preguntas no hayan captado. Es opcional.</p><textarea placeholder="Soy músico, me encanta..." value={free} onChange={e=>setFree(e.target.value)}/><button onClick={finish}>CREAR MI PERSONAJE</button></main>;
  if(step==='profile')return <main className="wizard"><div className="eyebrow">PERSONAJE CREADO</div><div className="profiletitle">{sources.photo&&<img src={sources.photo} alt="Perfil"/>}<h1>{identity.name.toUpperCase()} <span className="thin">· {identity.age} · {identity.city}</span></h1></div><div className="card"><h3>RASGOS DESTACADOS</h3><div className="chips">{traits.map(([k])=><span key={k}>{k}</span>)}</div><h3>PERFIL</h3><p>Tu personaje reaccionará según sus rasgos, recuerdos, forma de comunicarse y decisiones. La ficha interna incluye también su estilo afectivo, celos, exclusividad, apertura relacional e intimidad, y evolucionará mientras juegas.</p><p className="muted small">Las variables completas y el análisis de percepción permanecerán ocultos durante la partida.</p></div><button onClick={confirm}>ESTE SOY YO</button></main>;
  if(step==='boot')return <main className="center boot"><img className="bootlogo" src={PRIVATE_LIFE_LOGO} alt="Private Life"/><p className="muted">Configurando tu vida...</p><div className="loader"><i/></div></main>;
- if(step==='lock'&&!unlocked)return <Phone><div className="lock" onClick={()=>setUnlocked(true)}><Status/><div className="locktime">09:41</div><div className="date">Domingo, 27 de septiembre</div><img className="locklogo" src={PRIVATE_LIFE_LOGO} alt="Private Life"/><div className="swipe">⌃<br/><span>Toca para desbloquear</span></div></div></Phone>;
- return <Phone><div className="home"><Status/><div className="accountline"><span>@{authUser}</span><button onClick={logout}>SALIR</button></div><div className="hello">Buenos días, <b>{identity.name}</b></div><div className="apps"><App icon="◎" name="Social"/><App icon="●" name="Chat"/>{datingApps.tinder&&<App icon="T" name="Tinder"/>}{datingApps.grindr&&<App icon="G" name="Grindr"/>}<App icon="☎" name="Teléfono"/><App icon="♟" name="Contactos"/><App icon="▧" name="Galería"/><App icon="□" name="Agenda"/><App icon="≡" name="Notas"/><App icon="⚙" name="Ajustes"/></div><div className="dock"><App icon="☎" name=""/><App icon="●" name=""/><App icon="◎" name=""/></div></div></Phone>;
+ if(step==='lock'&&!unlocked)return <Phone><div className="lock realistic-lock" onClick={()=>setUnlocked(true)}><div className="wallpaper-layer"/><div className="lock-shade"/><Status/><LiveLockClock/><img className="locklogo" src={PRIVATE_LIFE_LOGO} alt="Private Life"/><div className="lock-actions"><span className="round-action">◉</span><span className="round-action">⌾</span></div><div className="swipe"><span>Toca o desliza hacia arriba para desbloquear</span></div></div></Phone>;
+ return <Phone><PhoneHome identity={identity} datingApps={datingApps} authUser={authUser} logout={logout}/></Phone>;
 }
+
+function LiveLockClock(){
+ const [now,setNow]=useState(null);
+ useEffect(()=>{const tick=()=>setNow(new Date());tick();const id=setInterval(tick,1000);return()=>clearInterval(id)},[]);
+ if(!now)return <><div className="locktime">--:--</div><div className="date">&nbsp;</div></>;
+ const time=now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+ const date=now.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+ return <><div className="locktime">{time}</div><div className="date">{date.charAt(0).toUpperCase()+date.slice(1)}</div></>;
+}
+function PhoneHome({identity,datingApps,authUser,logout}){
+ const [page,setPage]=useState(0);
+ const [startX,setStartX]=useState(null);
+ const [dragX,setDragX]=useState(0);
+ const [opened,setOpened]=useState(null);
+ const [pressing,setPressing]=useState(false);
+ function pointerDown(e){if(opened)return;setStartX(e.clientX);setDragX(0);setPressing(true);try{e.currentTarget.setPointerCapture(e.pointerId)}catch{}}
+ function pointerMove(e){if(startX===null||opened)return;setDragX(Math.max(-110,Math.min(110,e.clientX-startX)))}
+ function pointerUp(){if(startX!==null){if(dragX<-46)setPage(1);else if(dragX>46)setPage(0)}setStartX(null);setDragX(0);setPressing(false)}
+ const transform=page===0?'translate3d('+dragX+'px,0,0)':'translate3d(calc(-50% + '+dragX+'px),0,0)';
+ return <div className="home realistic-home">
+   <div className="wallpaper-layer"/><div className="home-shade"/><Status/>
+   <div className="accountline real-account"><span>@{authUser}</span><button onClick={logout}>SALIR</button></div>
+   <div className="home-slider-viewport" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
+     <div className={'home-pages '+(pressing?'dragging':'')} style={{transform}}>
+       <section className="home-page"><div className="apps ios-grid">
+         <PhoneApp src="/phone/instagram.webp" name="Instagram" onOpen={()=>setOpened('Instagram')}/>
+         {datingApps.tinder&&<PhoneApp src="/phone/tinder.webp" name="Tinder" onOpen={()=>setOpened('Tinder')}/>}
+         {datingApps.grindr&&<PhoneApp src="/phone/grindr.webp" name="Grindr" onOpen={()=>setOpened('Grindr')}/>}
+         <PhoneApp src="/phone/contacts.webp" name="Contactos" onOpen={()=>setOpened('Contactos')}/>
+         <PhoneApp src="/phone/photos.webp" name="Fotos" onOpen={()=>setOpened('Fotos')}/>
+         <PhoneApp src="/phone/calendar.webp" name="Calendario" onOpen={()=>setOpened('Calendario')}/>
+       </div></section>
+       <section className="home-page second-page">
+         <div className="clock-widget"><span>PRIVATE LIFE</span><b>{identity.name||'Tu vida'}</b><small>Tu historia continúa aquí</small></div>
+         <div className="apps ios-grid compact-grid">
+           <PhoneApp src="/phone/notes.webp" name="Notas" onOpen={()=>setOpened('Notas')}/>
+           <PhoneApp src="/phone/settings.webp" name="Ajustes" onOpen={()=>setOpened('Ajustes')}/>
+           <PhoneApp brand name="Private Life" onOpen={()=>setOpened('Private Life')}/>
+         </div>
+       </section>
+     </div>
+   </div>
+   <div className="page-dots"><i className={page===0?'active':''}/><i className={page===1?'active':''}/></div>
+   <div className="dock ios-dock">
+     <PhoneApp dock src="/phone/phone.webp" name="" onOpen={()=>setOpened('Teléfono')}/>
+     <PhoneApp dock src="/phone/messages.webp" name="" onOpen={()=>setOpened('Mensajes')}/>
+     <PhoneApp dock cssIcon="safari" name="" onOpen={()=>setOpened('Safari')}/>
+     <PhoneApp dock cssIcon="music" name="" onOpen={()=>setOpened('Música')}/>
+   </div>
+   {opened&&<AppWindow name={opened} onClose={()=>setOpened(null)}/>}
+ </div>
+}
+function PhoneApp({src,name,onOpen,dock=false,cssIcon='',brand=false}){
+ return <button className={'ios-app '+(dock?'dock-app':'')} onClick={e=>{e.stopPropagation();onOpen?.()}} aria-label={name||'Aplicación'}>
+   {brand?<div className="ios-appicon brand-icon"><img src={PRIVATE_LIFE_LOGO} alt=""/></div>:cssIcon?<div className={'ios-appicon css-app '+cssIcon}>{cssIcon==='music'?'♪':<span className="compass-needle"/>}</div>:<img className="ios-appicon" src={src} alt=""/>}
+   {name&&<span className="ios-label">{name}</span>}
+ </button>
+}
+function AppWindow({name,onClose}){
+ return <div className={'app-window app-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}>
+   <Status/><div className="app-window-head"><button onClick={onClose}>‹</button><b>{name}</b><span/></div>
+   <div className="app-window-content"><div className="app-window-title">{name}</div><div className="fake-card"/><div className="fake-row"/><div className="fake-row short"/><div className="fake-row"/></div>
+   <button className="home-gesture-button" aria-label="Volver al inicio" onClick={onClose}><span/></button>
+ </div>
+}
+
 function AuthScreen({mode,setMode,form,setForm,error,busy,login,register}){const creating=mode==='register';function submit(e){e.preventDefault();creating?register():login()}return <main className="authpage"><section className="authpanel"><div className="authbrand"><div className="authmark">P</div><div><div className="brand smallbrand">PRIVATE LIFE</div><p>Tu vida. Tus decisiones. Tu historia.</p></div></div><div className="authswitch"><button className={!creating?'active':''} onClick={()=>setMode('login')} type="button">INICIAR SESIÓN</button><button className={creating?'active':''} onClick={()=>setMode('register')} type="button">CREAR USUARIO</button></div><form className="authform" onSubmit={submit}><label><span>USUARIO</span><input autoComplete="username" value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="Tu nombre de usuario"/></label><label><span>CONTRASEÑA</span><input type="password" autoComplete={creating?'new-password':'current-password'} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="••••••••"/></label>{creating&&<label><span>REPETIR CONTRASEÑA</span><input type="password" autoComplete="new-password" value={form.repeat} onChange={e=>setForm({...form,repeat:e.target.value})} placeholder="••••••••"/></label>}{error&&<div className="autherror">{error}</div>}<button className="authsubmit" disabled={busy} type="submit">{busy?'PROCESANDO...':creating?'CREAR CUENTA':'ENTRAR'}</button></form><p className="authnote">{creating?'La cuenta guardará tu partida en el servidor para que puedas recuperarla desde otros dispositivos.':'Entra para continuar tu partida de Private Life.'}</p></section></main>}
 function Progress({n}){return <div className="progress">{[1,2,3,4,5].map(x=><i key={x} className={x<=n?'on':''}/>)}</div>}
 function Input({label,value,set,type='text'}){return <label><span>{label}</span><input type={type} value={value} onChange={e=>set(e.target.value)}/></label>}
 function Phone({children}){return <main className="stage"><div className="phone">{children}<div className="gesture"/></div></main>}
-function Status(){return <div className="status"><b>09:41</b><span>● ◔ 100%</span></div>}
+function Status(){const [now,setNow]=useState(null);useEffect(()=>{const tick=()=>setNow(new Date());tick();const id=setInterval(tick,30000);return()=>clearInterval(id)},[]);const time=now?now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'--:--';return <div className="status"><b>{time}</b><span className="status-icons"><span className="signal-bars"><i/><i/><i/><i/></span><span className="wifi-glyph">⌁</span><span className="battery"><i/></span></span></div>}
 function App({icon,name}){return <div className="app"><div className="appicon">{icon}</div>{name&&<span>{name}</span>}</div>}
