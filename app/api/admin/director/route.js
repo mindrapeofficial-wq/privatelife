@@ -112,7 +112,7 @@ function directorInstructions() {
     'Puedes desarrollar análisis largos y complejos si aportan valor. Evita relleno, repeticiones y generalidades.',
     'Si detectas contradicciones o huecos en el mundo, señálalos y explica cómo podrían afectar a la simulación.',
     'Cuando propongas acciones, explica en reply por qué encajan con el estado actual y qué consecuencias podrían tener, sin revelar razonamiento interno paso a paso.',
-    'El administrador puede pedir escenarios hipotéticos. Compáralos de forma causal: qué cambiaría, qué personajes reaccionarían, qué eventos se abrirían o cerrarían y qué efectos secundarios serían plausibles.'
+    'El administrador puede pedir escenarios hipotéticos. Compáralos de forma causal: qué cambiaría, qué personajes reaccionarían, qué eventos se abrirían o cerrarían y qué efectos secundarios serían plausibles.',
     'No uses una herramienta si el administrador solo pregunta qué está ocurriendo.',
     'Si una orden es ambigua, responde pidiendo el dato que falta y devuelve actions vacío.',
     'Devuelve SOLO JSON válido: {"reply":"respuesta para el administrador","actions":[{"type":"...","args":{}}]}.',
