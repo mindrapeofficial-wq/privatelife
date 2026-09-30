@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 function tz(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch{return'UTC'}}
 
-export default function LocationSetup({initialCity='',onComplete}){
+export default function LocationSetup({initialCity='',onComplete,onCancel=null}){
   const [mode,setMode]=useState('ask');
   const [manual,setManual]=useState(initialCity||'');
   const [busy,setBusy]=useState(false);
@@ -67,7 +67,7 @@ export default function LocationSetup({initialCity='',onComplete}){
     finally{setBusy(false)}
   }
 
-  return <main className="location-setup">
+  return <main className="location-setup">{onCancel&&<button className="location-back" onClick={onCancel} aria-label="Volver">‹</button>}
     <div className="location-orbit"><i/><span>⌖</span></div>
     <div className="eyebrow">TU MUNDO</div>
     <h1>¿Dónde estás?</h1>
