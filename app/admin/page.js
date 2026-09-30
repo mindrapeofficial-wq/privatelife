@@ -18,6 +18,8 @@ function world(save={}){
     directorLog:Array.isArray(save.world?.directorLog)?save.world.directorLog:[]}};
 }
 function fmt(v){if(!v)return '—';try{return new Intl.DateTimeFormat('es-ES',{dateStyle:'medium',timeStyle:'short'}).format(new Date(v))}catch{return String(v)}}
+function phoneEventText(ev){const names={phone_home:'Entró al inicio',open_app:'Abrió',close_app:'Cerró',home_page:'Cambió de escritorio',unlock:'Desbloqueó el teléfono',lock:'Bloqueó el teléfono',visibility:'Estado de la app',screen_change:'Cambió de pantalla',logout:'Cerró sesión'};const prefix=names[ev?.type]||String(ev?.type||'Actividad').replaceAll('_',' ');return ev?.label?prefix+' · '+ev.label:prefix}
+function phoneAppIcon(name){const icons={Instagram:'/phone/instagram.webp',Tinder:'/phone/tinder.webp',Grindr:'/phone/grindr.webp',Contactos:'/phone/contacts.webp',Fotos:'/phone/photos.webp',Calendario:'/phone/calendar.webp',Notas:'/phone/notes.webp',Ajustes:'/phone/settings.webp','Teléfono':'/phone/phone.webp',Mensajes:'/phone/messages.webp'};return icons[name]||''}
 
 export default function AdminPage(){
   const [ready,setReady]=useState(false),[users,setUsers]=useState([]),[selectedId,setSelectedId]=useState('');
@@ -40,16 +42,28 @@ export default function AdminPage(){
       setPlayer(loaded);setCharId(loaded.save.world.characters[0]?.id||'');
     }catch(e){setNotice(e.message)}finally{setBusy(false)}
   }
+  async function refreshPhone(id){
+    if(!id)return;
+    try{
+      const data=await api('/api/admin/player?userId='+encodeURIComponent(id),{cache:'no-store'});
+      const loaded={...data.player,save:world(data.player.save)};
+      setPlayer(cur=>cur&&String(cur.id)===String(id)?{...cur,...loaded}:loaded);
+    }catch(e){setNotice(e.message)}
+  }
   useEffect(()=>{let cancelled=false;(async()=>{try{
     const me=await api('/api/auth/me',{cache:'no-store'});
     if(me.user?.role!=='admin'){window.location.replace('/');return}
     if(!cancelled)await loadUsers();
   }catch{window.location.replace('/')}finally{if(!cancelled)setReady(true)}})();return()=>{cancelled=true}},[]);
   useEffect(()=>{if(selectedId)loadPlayer(selectedId)},[selectedId]);
+  useEffect(()=>{if(tab!=='phone'||!selectedId)return;refreshPhone(selectedId);const id=setInterval(()=>refreshPhone(selectedId),2000);return()=>clearInterval(id)},[tab,selectedId]);
 
   const save=player?.save?world(player.save):world({});
   const chars=save.world.characters,events=save.world.events;
   const character=useMemo(()=>chars.find(x=>x.id===charId)||chars[0]||null,[chars,charId]);
+  const phone=player?.phone||{state:{},activity:[],updatedAt:null},phoneState=phone.state||{},phoneActivity=Array.isArray(phone.activity)?phone.activity:[];
+  const phoneFresh=phone.updatedAt&&Date.now()-new Date(phone.updatedAt).getTime()<12000&&phoneState.visibility!=='offline';
+  const installedPhoneApps=['Instagram',...(save.datingApps?.tinder?['Tinder']:[]),...(save.datingApps?.grindr?['Grindr']:[]),'Contactos','Fotos','Calendario','Notas','Ajustes','Teléfono','Mensajes','Safari','Música'];
 
   function localEdit(fn){
     if(!player)return;
@@ -114,13 +128,35 @@ export default function AdminPage(){
       <header className="admin-header"><div><small>CONSOLA DEL DIRECTOR</small><h1>{player?(save.identity?.name||'@'+player.username):'Selecciona una partida'}</h1></div><div className="admin-status"><i/> ADMIN ACTIVO</div></header>
       {notice&&<div className="admin-notice">{notice}</div>}
       {!player?<div className="admin-empty large">Selecciona un jugador para empezar.</div>:<>
-        <nav className="admin-tabs">{[['overview','Resumen'],['characters','Personajes'],['events','Eventos'],['director','Director IA']].map(([k,l])=><button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>{l}</button>)}</nav>
+        <nav className="admin-tabs">{[['overview','Resumen'],['phone','Teléfono'],['characters','Personajes'],['events','Eventos'],['director','Director IA']].map(([k,l])=><button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>{l}</button>)}</nav>
 
         {tab==='overview'&&<div className="admin-grid">
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>ESTADO DE PARTIDA</span><button onClick={()=>loadPlayer(player.id)}>Actualizar</button></div><div className="admin-kpis"><div><b>{chars.length}</b><span>Personajes</span></div><div><b>{events.filter(x=>x.status!=='cerrado').length}</b><span>Eventos abiertos</span></div><div><b>{Object.keys(save.profile||{}).length}</b><span>Variables</span></div></div></section>
           <section className="admin-card"><div className="admin-card-head"><span>JUGADOR</span></div><dl className="admin-dl"><div><dt>Usuario</dt><dd>@{player.username}</dd></div><div><dt>Nombre</dt><dd>{save.identity?.name||'—'}</dd></div><div><dt>Edad</dt><dd>{save.identity?.age||'—'}</dd></div><div><dt>Ciudad</dt><dd>{save.identity?.city||'—'}</dd></div><div><dt>Ocupación</dt><dd>{save.identity?.occupation||'—'}</dd></div></dl></section>
           <section className="admin-card"><div className="admin-card-head"><span>ACTIVIDAD</span></div><dl className="admin-dl"><div><dt>Último acceso</dt><dd>{fmt(player.lastLoginAt)}</dd></div><div><dt>Último guardado</dt><dd>{fmt(player.updatedAt)}</dd></div><div><dt>Alta</dt><dd>{fmt(player.createdAt)}</dd></div></dl></section>
           <section className="admin-card admin-wide"><div className="admin-card-head"><span>VARIABLES OCULTAS DEL JUGADOR</span><button disabled={busy} onClick={()=>persist(save,'Variables del jugador ajustadas')}>Guardar</button></div><div className="admin-traits">{Object.entries(save.profile||{}).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=><label key={k}><span>{k.replaceAll('_',' ')}</span><input type="range" min="0" max="100" value={Number(v)||0} onChange={e=>localEdit(next=>{next.profile={...(next.profile||{}),[k]:Number(e.target.value)}})}/><b>{Number(v)||0}</b></label>)}{!Object.keys(save.profile||{}).length&&<div className="admin-empty">El jugador todavía no ha completado su perfil.</div>}</div></section>
+        </div>}
+
+        {tab==='phone'&&<div className="admin-phone-layout">
+          <section className="admin-card admin-phone-view"><div className="admin-card-head"><span>TELÉFONO DEL JUGADOR</span><div className={'admin-live-pill '+(phoneFresh?'live':'idle')}><i/>{phoneFresh?'EN DIRECTO':'SIN SEÑAL'}</div></div>
+            <div className="admin-phone-meta"><span>@{player.username}</span><span>Sincronización automática · 2 s</span></div>
+            <div className="director-phone">
+              <div className="director-phone-notch"/>
+              <div className="director-phone-status"><b>{new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</b><span>● ◔ 100%</span></div>
+              {phoneState.locked?<div className="director-phone-lock"><small>PANTALLA BLOQUEADA</small><b>{save.identity?.name||player.username}</b><span>Última señal {fmt(phone.updatedAt)}</span></div>:
+              <div className="director-phone-home">
+                <div className="director-phone-user"><span>@{player.username}</span><small>{phoneState.currentApp?'APP ABIERTA':'INICIO · PÁGINA '+((Number(phoneState.homePage)||0)+1)}</small></div>
+                {phoneState.currentApp?<div className="director-app-open"><div className="director-app-icon">{phoneAppIcon(phoneState.currentApp)?<img src={phoneAppIcon(phoneState.currentApp)} alt=""/>:<span>{String(phoneState.currentApp).slice(0,1)}</span>}</div><h3>{phoneState.currentApp}</h3><p>El jugador está dentro de esta aplicación.</p><div className="director-app-data"><span>Ruta</span><b>{phoneState.route||'/'}</b><span>Estado</span><b>{phoneState.visibility==='hidden'?'Segundo plano':'Visible'}</b></div></div>:
+                <div className="director-app-grid">{installedPhoneApps.map(name=><div className="director-app-tile" key={name}>{phoneAppIcon(name)?<img src={phoneAppIcon(name)} alt=""/>:<span>{name.slice(0,1)}</span>}<small>{name}</small></div>)}</div>}
+              </div>}
+              <div className="director-phone-gesture"/>
+            </div>
+          </section>
+          <section className="admin-card admin-phone-feed"><div className="admin-card-head"><span>ACTIVIDAD EN VIVO</span><button onClick={()=>refreshPhone(player.id)}>Actualizar</button></div>
+            <dl className="admin-dl admin-phone-facts"><div><dt>Estado</dt><dd>{phoneFresh?'Conectado':'Desconectado / inactivo'}</dd></div><div><dt>Pantalla</dt><dd>{phoneState.locked?'Bloqueo':phoneState.currentApp||phoneState.stage||'—'}</dd></div><div><dt>Visibilidad</dt><dd>{phoneState.visibility||'—'}</dd></div><div><dt>Última señal</dt><dd>{fmt(phone.updatedAt)}</dd></div></dl>
+            <div className="admin-card-head sub"><span>CRONOLOGÍA</span></div>
+            <div className="admin-phone-activity">{phoneActivity.map(ev=><div className="admin-phone-event" key={ev.id}><i/><div><b>{phoneEventText(ev)}</b><small>{fmt(ev.createdAt)}</small></div></div>)}{!phoneActivity.length&&<div className="admin-empty">Aún no hay actividad registrada. Aparecerá en cuanto el jugador use el teléfono.</div>}</div>
+          </section>
         </div>}
 
         {tab==='characters'&&<div className="admin-character-layout">
