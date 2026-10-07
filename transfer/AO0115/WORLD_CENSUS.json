@@ -307,6 +307,7 @@
   "missing_npc_definition_ids": [
     74
   ],
+  "exit_target_counts": {},
   "first_user_char_index_if_all_static_npcs_spawn": 1993,
   "top_npc_maps": [
     {
