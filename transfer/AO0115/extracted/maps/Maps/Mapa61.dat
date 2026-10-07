@@ -1,0 +1,27 @@
+[Mapa61]
+Name=Muelles de Banderbill
+MusicNum=12-1
+StartPos=0-0-0
+Terreno=BOSQUE
+Zona=CIUDAD
+Restringir=No
+pk=1
+BackUp=0
+
+[SONIDOS]
+Cantidad=3
+
+[SONIDO1]
+Flags=1
+Probabilidad=100
+Sonido=50
+
+[SONIDO2]
+Flags=1
+Probabilidad=20
+Sonido=63
+
+[SONIDO3]
+Flags=0
+Probabilidad=80
+Sonido=105

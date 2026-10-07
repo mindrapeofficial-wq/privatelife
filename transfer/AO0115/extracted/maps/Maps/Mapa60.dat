@@ -1,0 +1,10 @@
+[Mapa60]
+Name=Banderbill norte
+MusicNum=12-1
+MagiaSinefecto=0
+StartPos=0-0-0
+Terreno=BOSQUE
+Zona=CIUDAD
+Restringir=No
+BackUp= 1
+Pk=1

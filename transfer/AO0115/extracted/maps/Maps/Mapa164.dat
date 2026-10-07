@@ -1,0 +1,10 @@
+[Mapa164]
+Name=Desfiladero
+MusicNum=50-1
+MagiaSinefecto=0
+StartPos=0-0-0
+Terreno=NIEVE
+Zona=CAMPO
+Restringir=No
+BackUp= 1
+Pk=0

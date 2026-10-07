@@ -1,0 +1,10 @@
+[Mapa167]
+Name=Nuevo Mapa
+MusicNum=7-1
+MagiaSinefecto=0
+StartPos=0-0-0
+Terreno=NIEVE
+Zona=DUNGEON
+Restringir=Si
+BackUp= 1
+Pk=1

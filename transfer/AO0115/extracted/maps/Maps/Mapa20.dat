@@ -1,0 +1,28 @@
+[Mapa20]
+Name=Desierto Rinkel
+MusicNum=10-1
+MagiaSinefecto=0
+StartPos=1-0-0
+Terreno=DESIERTO
+Zona=CAMPO
+Restringir=No
+BackUp= 1
+Pk=0
+
+[SONIDOS]
+Cantidad=3
+
+[SONIDO1]
+Flags=1
+Probabilidad=20
+Sonido=107
+
+[SONIDO2]
+Flags=1
+Probabilidad=20
+Sonido=108
+
+[SONIDO3]
+Flags=0
+Probabilidad=80
+Sonido=105

@@ -1,0 +1,10 @@
+[Mapa162]
+Name=Catacumbas Pretorianas
+MusicNum=15-1
+MagiaSinefecto=0
+StartPos=0-0-0
+Terreno=NIEVE
+Zona=DUNGEON
+Restringir=No
+BackUp= 1
+Pk=0
