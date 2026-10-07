@@ -174,12 +174,11 @@
     168,
     170
   ],
-  "total_static_npcs": 1929,
+  "total_static_npcs": 1928,
   "total_objects": 10575,
   "total_exits": 28616,
   "maps_with_npcs": 100,
   "unique_npc_definition_ids_used": [
-    0,
     1,
     4,
     5,
@@ -306,10 +305,9 @@
     582
   ],
   "missing_npc_definition_ids": [
-    0,
     74
   ],
-  "first_user_char_index_if_all_static_npcs_spawn": 1994,
+  "first_user_char_index_if_all_static_npcs_spawn": 1993,
   "top_npc_maps": [
     {
       "map": 112,
@@ -333,13 +331,6 @@
       "exits": 94
     },
     {
-      "map": 1,
-      "format": "v2",
-      "npcs": 45,
-      "objects": 199,
-      "exits": 343
-    },
-    {
       "map": 17,
       "format": "v2",
       "npcs": 45,
@@ -352,6 +343,13 @@
       "npcs": 45,
       "objects": 383,
       "exits": 253
+    },
+    {
+      "map": 1,
+      "format": "v2",
+      "npcs": 44,
+      "objects": 199,
+      "exits": 343
     },
     {
       "map": 37,
@@ -456,7 +454,7 @@
     {
       "map": 1,
       "format": "v2",
-      "npcs": 45,
+      "npcs": 44,
       "objects": 199,
       "exits": 343
     },
