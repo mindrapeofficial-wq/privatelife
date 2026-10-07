@@ -1,0 +1,45 @@
+name: AO 0.11.5 transfer
+
+on:
+  push:
+    branches:
+      - ao0115-source-transfer
+
+permissions:
+  contents: write
+
+jobs:
+  transfer:
+    if: github.event.head_commit.message != 'AO0115 transfer payload'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ao0115-source-transfer
+      - name: Download and verify official files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p transfer/AO0115
+          curl -L --fail --retry 5 --retry-delay 2 -o transfer/AO0115/AOClient-src.zip "https://sourceforge.net/projects/morgoao/files/Argentum%20Online/0.11.5/AOClient-src.zip/download"
+          curl -L --fail --retry 5 --retry-delay 2 -o "transfer/AO0115/AOServer-src+res.zip" "https://sourceforge.net/projects/morgoao/files/Argentum%20Online/0.11.5/AOServer-src%2Bres.zip/download"
+          curl -L --fail --retry 5 --retry-delay 2 -o transfer/AO0115/Dat.zip "https://sourceforge.net/projects/morgoao/files/Argentum%20Online/0.11.5/Dat.zip/download"
+          curl -L --fail --retry 5 --retry-delay 2 -o transfer/AO0115/Maps.zip "https://sourceforge.net/projects/morgoao/files/Argentum%20Online/0.11.5/Maps.zip/download"
+          curl -L --fail --retry 5 --retry-delay 2 -o "transfer/AO0115/AOWorldEditor-src+bin.zip" "https://sourceforge.net/projects/morgoao/files/Argentum%20Online/0.11.5/AOWorldEditor-src%2Bbin.zip/download"
+          cat > transfer/AO0115/SHA256SUMS.txt <<'EOF'
+          c20a2d0c4e367e300797b84e5f9d8df324e9d22c96a257ac2daf3dd7401d1fb4  AOClient-src.zip
+          01e2c9428c82d792feecc70cf26956f2be0afc6fd8a53c5408011001b3b03255  AOServer-src+res.zip
+          fa83be03161f3ab5157cdcbf9b19f9c777944c3dc2e0887256bff09e45ddcca2  Dat.zip
+          0656f3c7eb8c709f7fd8daad07cade91eab2d3e1c45dcd8f3364984e55113014  Maps.zip
+          3c8b7e8fd706b9f629925df119cd51b57866424573f865b9e920ba6ee1a39ca3  AOWorldEditor-src+bin.zip
+          EOF
+          (cd transfer/AO0115 && sha256sum -c SHA256SUMS.txt)
+      - name: Commit transfer payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "OpenAI transfer"
+          git config user.email "actions@github.com"
+          git add transfer/AO0115
+          git commit -m "AO0115 transfer payload"
+          git push origin HEAD:ao0115-source-transfer
