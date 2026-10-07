@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   census:
-    if: contains(github.event.head_commit.message, 'run AO0115 world census v4')
+    if: contains(github.event.head_commit.message, 'run AO0115 world census v5')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +23,7 @@ jobs:
           root=pathlib.Path("transfer/AO0115/extracted/maps/Maps")
           per=[]
           all_npc_ids=[]
+          exit_targets={}
           for i in range(1,171):
               mb=(root/f"Mapa{i}.map").read_bytes()
               data=(root/f"Mapa{i}.inf").read_bytes()
@@ -35,7 +36,9 @@ jobs:
                       exit_map=struct.unpack_from("<h",data,o)[0]
                       npc=struct.unpack_from("<h",data,o+6)[0]
                       obj=struct.unpack_from("<h",data,o+8)[0]
-                      if exit_map>0: exits+=1
+                      if exit_map>0:
+                          exits+=1
+                          exit_targets[exit_map]=exit_targets.get(exit_map,0)+1
                       if npc>0:
                           npcs+=1
                           all_npc_ids.append(npc)
@@ -88,6 +91,7 @@ jobs:
               "maps_with_npcs":sum(1 for x in per if x["npcs"]),
               "unique_npc_definition_ids_used":unique_used,
               "missing_npc_definition_ids":missing,
+              "exit_target_counts":exit_targets,
               "first_user_char_index_if_all_static_npcs_spawn":first_user_char,
               "top_npc_maps":sorted(per,key=lambda x:x["npcs"],reverse=True)[:20],
               "per_map":per,
