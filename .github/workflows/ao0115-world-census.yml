@@ -1,0 +1,58 @@
+name: AO 0.11.5 world census
+
+on:
+  push:
+    branches:
+      - ao0115-source-transfer
+
+permissions:
+  contents: write
+
+jobs:
+  census:
+    if: contains(github.event.head_commit.message, 'run AO0115 world census')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ao0115-source-transfer
+      - name: Count static world records
+        shell: python
+        run: |
+          import json, pathlib
+          root=pathlib.Path("transfer/AO0115/extracted/maps/Maps")
+          per=[]
+          for i in range(1,171):
+              data=(root/f"Mapa{i}.inf").read_bytes()
+              o=10; npcs=objs=exits=0
+              for tile in range(10000):
+                  flags=data[o]; o+=1
+                  if flags & 1: o+=6; exits+=1
+                  if flags & 2: o+=2; npcs+=1
+                  if flags & 4: o+=4; objs+=1
+              if o != len(data):
+                  raise SystemExit(f"Mapa{i}.inf consumed {o} of {len(data)}")
+              per.append({"map":i,"npcs":npcs,"objects":objs,"exits":exits})
+          total_npcs=sum(x["npcs"] for x in per)
+          # NextOpenCharIndex uses 1..63 then skips 64..127.
+          first_user_char=(total_npcs+1) if total_npcs < 63 else (total_npcs+65)
+          summary={
+              "maps":170,
+              "total_static_npcs":total_npcs,
+              "total_objects":sum(x["objects"] for x in per),
+              "total_exits":sum(x["exits"] for x in per),
+              "maps_with_npcs":sum(1 for x in per if x["npcs"]),
+              "first_user_char_index_if_all_static_npcs_spawn":first_user_char,
+              "top_npc_maps":sorted(per,key=lambda x:x["npcs"],reverse=True)[:20],
+              "per_map":per,
+          }
+          out=pathlib.Path("transfer/AO0115/WORLD_CENSUS.json")
+          out.write_text(json.dumps(summary,indent=2),encoding="utf-8")
+      - name: Commit census
+        shell: bash
+        run: |
+          git config user.name "OpenAI preservation"
+          git config user.email "actions@github.com"
+          git add transfer/AO0115/WORLD_CENSUS.json
+          git commit -m "AO0115 world census result"
+          git push origin HEAD:ao0115-source-transfer
