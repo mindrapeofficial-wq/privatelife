@@ -1,0 +1,40 @@
+name: Extract AO 0.11.5 verified snapshot
+
+on:
+  push:
+    branches:
+      - ao0115-source-transfer
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    if: contains(github.event.head_commit.message, 'extract verified AO0115 snapshot')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ao0115-source-transfer
+      - name: Extract
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf transfer/AO0115/extracted
+          mkdir -p transfer/AO0115/extracted/client-src transfer/AO0115/extracted/server-src-res transfer/AO0115/extracted/dat transfer/AO0115/extracted/maps transfer/AO0115/extracted/worldeditor
+          unzip -q transfer/AO0115/AOClient-src.zip -d transfer/AO0115/extracted/client-src
+          unzip -q "transfer/AO0115/AOServer-src+res.zip" -d transfer/AO0115/extracted/server-src-res
+          unzip -q transfer/AO0115/Dat.zip -d transfer/AO0115/extracted/dat
+          unzip -q transfer/AO0115/Maps.zip -d transfer/AO0115/extracted/maps
+          unzip -q "transfer/AO0115/AOWorldEditor-src+bin.zip" -d transfer/AO0115/extracted/worldeditor
+          find transfer/AO0115/extracted -type f | sort > transfer/AO0115/EXTRACTED_FILELIST.txt
+          find transfer/AO0115/extracted -type f -printf '%s %p\n' | sort -n > transfer/AO0115/EXTRACTED_SIZES.txt
+      - name: Commit extracted snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "OpenAI preservation"
+          git config user.email "actions@github.com"
+          git add transfer/AO0115/extracted transfer/AO0115/EXTRACTED_FILELIST.txt transfer/AO0115/EXTRACTED_SIZES.txt
+          git commit -m "AO0115 extracted verified snapshot"
+          git push origin HEAD:ao0115-source-transfer
