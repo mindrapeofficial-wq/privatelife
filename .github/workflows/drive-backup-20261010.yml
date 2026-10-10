@@ -1,0 +1,37 @@
+name: Drive recovery archive 2026-10-10
+on:
+  push:
+    branches:
+      - archive/drive-backup-20261010
+    paths:
+      - .github/workflows/drive-backup-20261010.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  create-recovery-archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Build verifiable code and history backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/drive-backup"
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+          git bundle create "$RUNNER_TEMP/drive-backup/git-history.bundle" --all
+          git bundle verify "$RUNNER_TEMP/drive-backup/git-history.bundle"
+          tar -czf "$RUNNER_TEMP/drive-backup/source-at-backup-branch.tar.gz" --exclude=.git -C "$GITHUB_WORKSPACE" .
+          git show --no-patch --format=fuller HEAD > "$RUNNER_TEMP/drive-backup/commit.txt"
+          git branch -r > "$RUNNER_TEMP/drive-backup/branches.txt"
+          (cd "$RUNNER_TEMP/drive-backup" && sha256sum git-history.bundle source-at-backup-branch.tar.gz > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-recovery-${{ github.event.repository.name }}-20261010
+          path: ${{ runner.temp }}/drive-backup/
+          retention-days: 30
+          if-no-files-found: error
